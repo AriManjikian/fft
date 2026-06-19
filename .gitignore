@@ -1,0 +1,7 @@
+*.vcd
+*.xml
+*.dat
+*.txt
+*.s
+sim_build
+__pycache__

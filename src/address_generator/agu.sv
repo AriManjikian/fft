@@ -9,11 +9,12 @@ module agu #(
     output logic o_wr_en,
     output logic [DATA_DEPTH_LOG2-1:0] o_raddr_mem_a,
     output logic [DATA_DEPTH_LOG2-1:0] o_raddr_mem_b,
-    output logic [DATA_DEPTH_LOG2-1:0] o_raddr_twiddle
+    output logic [DATA_DEPTH_LOG2-2:0] o_raddr_twiddle
 );
   // Parameters
   localparam int C_NUM_LEVELS = $clog2(DATA_DEPTH_LOG2);
   localparam int C_HOLD_CNT_W = $clog2(C_HOLD_COUNT) + 2;
+  localparam logic [C_NUM_LEVELS-1:0] LAST_LEVEL = C_NUM_LEVELS'(DATA_DEPTH_LOG2 - 1);
   // State
   typedef enum logic [1:0] {
     IDLE,
@@ -73,7 +74,7 @@ module agu #(
         end
       end
       RUN: begin
-        if (r_addr[DATA_DEPTH_LOG2-1] && (r_level >= DATA_DEPTH_LOG2 - 1)) begin
+        if (r_addr[DATA_DEPTH_LOG2-1] && (r_level >= LAST_LEVEL)) begin
           o_done <= 1'b1;
           ctrl_state <= DONE;
         end
@@ -104,7 +105,7 @@ module agu #(
     if (w_clear) begin
       r_level <= '0;
     end else if (r_addr[DATA_DEPTH_LOG2-1]) begin
-      if (r_level >= DATA_DEPTH_LOG2 - 1) r_level <= '0;
+      if (r_level >= LAST_LEVEL) r_level <= '0;
       else r_level <= r_level + 1;
     end
   end
@@ -112,7 +113,7 @@ module agu #(
   // Hold Counter
   always_ff @(posedge clk) begin
     if (r_addr[DATA_DEPTH_LOG2-1]) begin
-      r_hold_counter <= C_HOLD_COUNT;
+      r_hold_counter <= C_HOLD_CNT_W'(C_HOLD_COUNT);
     end else if (r_hold_counter[C_HOLD_CNT_W-1] != 1'b1) begin
       r_hold_counter <= r_hold_counter - 1;
     end
@@ -158,7 +159,7 @@ module agu #(
       r_tw_bit_mask <= '0;
       r_addr_tw     <= '0;
     end else begin
-      r_tw_bit_mask[DATA_DEPTH_LOG2-int'(r_level)] <= 1'b1;
+      r_tw_bit_mask[DATA_DEPTH_LOG2-int'(r_level)-1] <= 1'b1;
       r_addr_tw <= r_tw_bit_mask[DATA_DEPTH_LOG2-2:0] & r_addr_d1[DATA_DEPTH_LOG2-2:0];
     end
   end
