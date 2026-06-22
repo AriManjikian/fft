@@ -3,8 +3,7 @@ module fft_top #(
 
     parameter int NFFT = 32,
     parameter int DATA_WIDTH = 16,
-    parameter int QFORMAT = 15,
-    parameter string PRELOAD_DIRECTIVE = "build"
+    parameter int QFORMAT = 15
 ) (
     input logic clk,
     input logic reset,
@@ -98,41 +97,45 @@ module fft_top #(
   logic        [             2:0] r_tvalid_out_pipeline = '0;
 
   assign w_buffer_tvalid_in = i_tvalid && (s_fft_state == FILL_BUFFER);
-  assign w_agu_start = w_br_tvalid_out && (w_br_to_mb_addr_normal == (NFFT - 1));
+  assign w_agu_start = w_br_tvalid_out && (int'(w_br_to_mb_addr_normal) == (NFFT - 1));
   assign w_tready_out = (s_fft_state == FILL_BUFFER);
   assign o_tready = w_tready_out;
   assign o_tvalid = r_tvalid_out_pipeline[2];
 
   // FSM
   always_ff @(posedge clk) begin
-    casez (s_fft_state)
-      IDLE: begin
-        s_fft_state <= FILL_BUFFER;
-      end
-      FILL_BUFFER: begin
-        if (i_tvalid) begin
-          if (r_input_buf_addr >= NFFT - 1) begin
-            s_fft_state <= LOAD_UNLOAD;
-          end
-        end
-      end
-      LOAD_UNLOAD: begin
-        if (r_input_buf_addr >= NFFT - 1) begin
-          s_fft_state <= RUN;
-        end
-      end
-      RUN: begin
-        if (w_agu_done) begin
-          s_fft_state <= HOLD;
-        end
-      end
-      HOLD: begin
-        if (r_hold_counter[4]) begin
+    if (reset) begin
+      s_fft_state <= IDLE;
+    end else begin
+      case (s_fft_state)
+        IDLE: begin
           s_fft_state <= FILL_BUFFER;
         end
-      end
-      default: s_fft_state <= IDLE;
-    endcase
+        FILL_BUFFER: begin
+          if (i_tvalid) begin
+            if (int'(r_input_buf_addr) >= NFFT - 1) begin
+              s_fft_state <= LOAD_UNLOAD;
+            end
+          end
+        end
+        LOAD_UNLOAD: begin
+          if (int'(r_input_buf_addr) >= NFFT - 1) begin
+            s_fft_state <= RUN;
+          end
+        end
+        RUN: begin
+          if (w_agu_done) begin
+            s_fft_state <= HOLD;
+          end
+        end
+        HOLD: begin
+          if (r_hold_counter[4]) begin
+            s_fft_state <= FILL_BUFFER;
+          end
+        end
+        default: s_fft_state <= IDLE;
+      endcase
+    end
   end
 
   // FFT Control
@@ -145,12 +148,12 @@ module fft_top #(
       r_mem_select <= '0;
     end else if (s_fft_state == FILL_BUFFER) begin
       if (w_buffer_tvalid_in) begin
-        if (r_input_buf_addr >= (NFFT - 1)) r_input_buf_addr <= '0;
+        if (int'(r_input_buf_addr) >= (NFFT - 1)) r_input_buf_addr <= '0;
         else r_input_buf_addr <= r_input_buf_addr + 1'b1;
       end
     end else if (s_fft_state == LOAD_UNLOAD) begin
       r_buffer_tvalid_out <= 1'b1;
-      if (r_input_buf_addr >= (NFFT - 1)) r_input_buf_addr <= '0;
+      if (int'(r_input_buf_addr) >= (NFFT - 1)) r_input_buf_addr <= '0;
       else r_input_buf_addr <= r_input_buf_addr + 1'b1;
     end else if (s_fft_state == RUN) begin
       if (w_agu_wr_rising_edge) begin
@@ -237,7 +240,7 @@ module fft_top #(
       .i_xr              (w_calculated_xr),
       .i_xi              (w_calculated_xi),
       .i_yr              (w_calculated_yr),
-      .i_yi              (w_calculated_yr),
+      .i_yi              (w_calculated_yi),
       .o_xr              (w_stored_xr),
       .o_xi              (w_stored_xi),
       .o_yr              (w_stored_yr),
@@ -245,9 +248,8 @@ module fft_top #(
   );
   // Twiddle ROM
   twiddle_rom_wrapper #(
-      .DATA_WIDTH       (DATA_WIDTH),
-      .DATA_DEPTH       (NFFT),
-      .PRELOAD_DIRECTIVE(PRELOAD_DIRECTIVE)
+      .DATA_WIDTH(DATA_WIDTH),
+      .DATA_DEPTH(NFFT)
   ) twiddle_rom_wrapper_inst (
       .clk   (clk),
       .i_addr(r_rd_addr_twiddle_d2),
@@ -291,7 +293,7 @@ module fft_top #(
   );
 
   // Input data buffer
-  assign w_buffer_re_im_in = i_tdata_re && i_tdata_im;
+  assign w_buffer_re_im_in = {i_tdata_re, i_tdata_im};
   sp_bram #(
       .RAM_WIDTH     (2 * DATA_WIDTH),
       .RAM_DEPTH_BITS(C_NFFT_LOG2  /* default 5 */)

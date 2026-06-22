@@ -42,8 +42,8 @@ module memory_bank_wrapper #(
   logic [DATA_WIDTH-1:0] w_data_out_1_xi;
   logic [DATA_WIDTH-1:0] w_data_out_1_yr;
   logic [DATA_WIDTH-1:0] w_data_out_1_yi;
-  logic r_wren_1_X;
-  logic r_wren_1_Y;
+  logic r_wren_1_X = 1'b0;
+  logic r_wren_1_Y = 1'b0;
 
   // Bank 2
   logic [DATA_DEPTH_LOG2-1:0] r_addr_2_X;
@@ -146,7 +146,6 @@ module memory_bank_wrapper #(
         o_im <= w_data_out_2_xi;
       end
     end
-
   end
 
   // data_wren mux
@@ -156,9 +155,11 @@ module memory_bank_wrapper #(
     r_wren_2_X <= i_wren_2;
     r_wren_2_Y <= i_wren_2;
     if (i_load_unload) begin
-      r_wren_2_X <= i_load_unload;
-    end else begin
-      r_wren_1_X <= i_load_unload;
+      if (r_last_write_mem_1) begin
+        r_wren_2_X <= i_load_unload;
+      end else begin
+        r_wren_1_X <= i_load_unload;
+      end
     end
   end
 

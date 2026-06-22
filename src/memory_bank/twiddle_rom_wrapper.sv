@@ -1,7 +1,6 @@
 module twiddle_rom_wrapper #(
     parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH = 32,
-    parameter string PRELOAD_DIRECTIVE = "build"
+    parameter int DATA_DEPTH = 32
 ) (
     input logic clk,
     input logic [$clog2(DATA_DEPTH)-1:0] i_addr,
@@ -9,46 +8,35 @@ module twiddle_rom_wrapper #(
     output logic [DATA_WIDTH-1:0] o_ti
 );
 
-  localparam string C_INIT_FILE_RE_SRC = "../../scripts/twiddle_factors/fft_%0d/twiddles_real.txt";
-  localparam string C_INIT_FILE_IM_SRC = "../../scripts/twiddle_factors/fft_%0d/twiddles_imag.txt";
-  localparam string C_INIT_FILE_RE_TB =
-        "../../../scripts/twiddle_factors/fft_%0d/twiddles_real.txt";
-  localparam string C_INIT_FILE_IM_TB =
-        "../../../scripts/twiddle_factors/fft_%0d/twiddles_imag.txt";
-
+  string BASE_PATH;
   string real_file;
   string imag_file;
-
-  initial begin
-    if (PRELOAD_DIRECTIVE == "build") begin
-      real_file = $sformatf(C_INIT_FILE_RE_SRC, DATA_DEPTH);
-      imag_file = $sformatf(C_INIT_FILE_IM_SRC, DATA_DEPTH);
-    end else if (PRELOAD_DIRECTIVE == "testbench") begin
-      real_file = $sformatf(C_INIT_FILE_RE_TB, DATA_DEPTH);
-      imag_file = $sformatf(C_INIT_FILE_IM_TB, DATA_DEPTH);
-    end else begin
-      $fatal(1, "Expected PRELOAD_DIRECTIVE = build or testbench, got %s", PRELOAD_DIRECTIVE);
-    end
-  end
 
   logic [DATA_WIDTH-1:0] rom_re[0:DATA_DEPTH-1];
   logic [DATA_WIDTH-1:0] rom_im[0:DATA_DEPTH-1];
 
+  integer i;
+
   initial begin
-    integer i;
+    $display("TWIDDLE ROM INIT START");
+
+    if (!$value$plusargs("BASE_PATH=%s", BASE_PATH)) begin
+      $fatal(1, "BASE_PATH not provided");
+    end
+
+    real_file = $sformatf("%s/fft_%0d/twiddles_real.txt", BASE_PATH, DATA_DEPTH);
+    imag_file = $sformatf("%s/fft_%0d/twiddles_imag.txt", BASE_PATH, DATA_DEPTH);
+
+    $display("real_file = %s", real_file);
+    $display("imag_file = %s", imag_file);
 
     for (i = 0; i < DATA_DEPTH; i++) begin
       rom_re[i] = '0;
       rom_im[i] = '0;
     end
 
-    if (PRELOAD_DIRECTIVE == "build") begin
-      $readmemh($sformatf(C_INIT_FILE_RE_SRC, DATA_DEPTH), rom_re);
-      $readmemh($sformatf(C_INIT_FILE_IM_SRC, DATA_DEPTH), rom_im);
-    end else if (PRELOAD_DIRECTIVE == "testbench") begin
-      $readmemh($sformatf(C_INIT_FILE_RE_TB, DATA_DEPTH), rom_re);
-      $readmemh($sformatf(C_INIT_FILE_IM_TB, DATA_DEPTH), rom_im);
-    end
+    $readmemh(real_file, rom_re);
+    $readmemh(imag_file, rom_im);
   end
 
   always_ff @(posedge clk) begin
