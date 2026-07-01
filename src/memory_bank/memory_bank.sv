@@ -1,6 +1,6 @@
 module memory_bank #(
     parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH_LOG2 = 5
+    parameter int DATA_DEPTH_LOG2 = 10
 ) (
     input logic clk,
 

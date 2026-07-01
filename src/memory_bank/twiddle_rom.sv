@@ -1,6 +1,6 @@
 module twiddle_rom #(
     parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH = 32,
+    parameter int DATA_DEPTH = 1024,
     parameter string INIT_FILE = ""
 ) (
     input logic clk,

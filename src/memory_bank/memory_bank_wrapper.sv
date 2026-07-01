@@ -1,6 +1,6 @@
 module memory_bank_wrapper #(
     parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH_LOG2 = 5
+    parameter int DATA_DEPTH_LOG2 = 10
 ) (
     input logic clk,
     // Control
@@ -136,7 +136,7 @@ module memory_bank_wrapper #(
       o_yi <= w_data_out_2_yi;
     end
     if (r_load_unload_pipeline[$high(r_load_unload_pipeline)]) begin
-      o_index <= r_index_out_pipeline[$high(r_index_out_pipeline)];
+      o_index <= r_index_out_pipeline[$high(r_index_out_pipeline)-1];
 
       if (r_last_write_mem_1) begin
         o_re <= w_data_out_1_xr;

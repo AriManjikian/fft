@@ -1,6 +1,6 @@
 module sp_bram #(
     parameter int RAM_WIDTH = 16,
-    parameter int RAM_DEPTH_BITS = 5
+    parameter int RAM_DEPTH_BITS = 10
 ) (
     input logic clk,
     input logic [RAM_DEPTH_BITS-1:0] i_addr,

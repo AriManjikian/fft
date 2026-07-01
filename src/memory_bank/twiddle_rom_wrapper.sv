@@ -1,6 +1,6 @@
 module twiddle_rom_wrapper #(
     parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH = 32
+    parameter int DATA_DEPTH = 1024
 ) (
     input logic clk,
     input logic [$clog2(DATA_DEPTH)-1:0] i_addr,

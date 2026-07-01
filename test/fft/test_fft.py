@@ -1,22 +1,33 @@
-import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ClockCycles
-from cocotb.result import SimTimeoutError
-import numpy as np
 import logging
+import os
+
+import cocotb
+
+import matplotlib.pyplot as plt
+import numpy as np
+from cocotb.clock import Clock
+from cocotb.result import SimTimeoutError
+from cocotb.triggers import RisingEdge
 
 logger = logging.getLogger("cocotb")
 logger.setLevel(logging.DEBUG)
 
-NFFT = 32
+NFFT = 1024
 DATA_WIDTH = 16
 QFORMAT = 15
 SCALE = 1 << QFORMAT
 
 CLK_PERIOD_NS = 5
 TIMEOUT_CYCLES = 5000
+TONE_BIN = 24
+GOLDEN_SCALE = 1 / NFFT
+
+PLOT_DIR = os.path.join(os.path.dirname(__file__), "plots")
 
 
+# ----------------------------------------------------------------------
+# Fixed-point helpers
+# ----------------------------------------------------------------------
 def bit_reverse_index(i: int, nbits: int) -> int:
     r = 0
     for b in range(nbits):
@@ -35,17 +46,16 @@ def from_q15(value: int) -> float:
 
 
 def make_test_vector(nfft: int):
-    """
-    Single-tone real cosine at bin 3 -> energy only at bins 3 and nfft-3.
-    Sparse spectrum makes a bin-permutation bug visually obvious in the log
-    instead of producing a diffuse wall of small mismatches.
-    """
+    """Single-tone real cosine -> sparse golden spectrum (bins TONE_BIN, nfft-TONE_BIN)."""
     n = np.arange(nfft)
-    time_domain = 0.5 * np.cos(2 * np.pi * 3 * n / nfft)
-    golden = np.fft.fft(time_domain)
+    time_domain = 0.5 * np.cos(2 * np.pi * TONE_BIN * n / nfft)
+    golden = np.fft.fft(time_domain) * GOLDEN_SCALE
     return time_domain, golden
 
 
+# ----------------------------------------------------------------------
+# DUT drive / collect
+# ----------------------------------------------------------------------
 async def reset_dut(dut):
     dut.reset.value = 1
     dut.i_tvalid.value = 0
@@ -66,7 +76,7 @@ async def drive_input(dut, samples_q15):
         dut.i_tvalid.value = 1
         await RisingEdge(dut.clk)
         dut.i_tvalid.value = 0
-        logger.debug(f"Drove sample {i}: re={re_q} im={im_q}")
+        logger.debug("Drove sample %d: re=%d im=%d", i, re_q, im_q)
 
 
 async def collect_outputs(dut, expected_count):
@@ -84,8 +94,14 @@ async def collect_outputs(dut, expected_count):
             outputs.append((idx, re, im))
             cycles_since_last = 0
             logger.debug(
-                f"Output beat {len(outputs)}/{expected_count}: "
-                f"index={idx} re={re} im={im}"
+                "Output beat %2d/%d: idx=%2d re=%6d (%8.5f) im=%6d (%8.5f)",
+                len(outputs),
+                expected_count,
+                idx,
+                re,
+                from_q15(re),
+                im,
+                from_q15(im),
             )
 
         if cycles_since_last > TIMEOUT_CYCLES:
@@ -97,6 +113,9 @@ async def collect_outputs(dut, expected_count):
     return outputs
 
 
+# ----------------------------------------------------------------------
+# Scoring
+# ----------------------------------------------------------------------
 def score_against(outputs_sorted, golden, label):
     errs = []
     for (idx, re_q, im_q), g in zip(outputs_sorted, golden):
@@ -106,10 +125,103 @@ def score_against(outputs_sorted, golden, label):
         errs.append((idx, actual, g, err_re, err_im))
     max_re = max(e[3] for e in errs)
     max_im = max(e[4] for e in errs)
-    logger.info(f"[{label}] max_err_re={max_re:.5f} max_err_im={max_im:.5f}")
+    logger.info("[%s] max_err_re=%.5f max_err_im=%.5f", label, max_re, max_im)
     return max_re, max_im, errs
 
 
+# ----------------------------------------------------------------------
+# Plotting — DUT vs golden overlay
+# ----------------------------------------------------------------------
+def plot_overlay(outputs_sorted, golden, label, filename):
+    bins = np.array([idx for idx, _, _ in outputs_sorted])
+    dut_complex = np.array(
+        [from_q15(re) + 1j * from_q15(im) for _, re, im in outputs_sorted]
+    )
+    dut_mag = np.abs(dut_complex)
+    golden_mag = np.abs(golden)
+    err = np.abs(dut_mag - golden_mag[bins])
+
+    plt.style.use("dark_background")
+    fig, (ax_mag, ax_err) = plt.subplots(
+        2,
+        1,
+        figsize=(13, 7),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3, 1]},
+        facecolor="#0d1117",
+    )
+    fig.suptitle(
+        f"FFT Core vs NumPy Golden — {label}",
+        fontsize=15,
+        fontweight="bold",
+        color="#e6edf3",
+    )
+
+    # Magnitude overlay
+    ax_mag.fill_between(
+        np.arange(len(golden_mag)),
+        golden_mag,
+        color="#58a6ff",
+        alpha=0.25,
+        label="golden |X[k]|",
+    )
+    ax_mag.plot(
+        np.arange(len(golden_mag)), golden_mag, color="#58a6ff", lw=1.5, alpha=0.8
+    )
+    ax_mag.scatter(
+        bins,
+        dut_mag,
+        color="#ff7b72",
+        s=18,
+        zorder=5,
+        label="DUT |X[k]|",
+        edgecolors="none",
+    )
+    ax_mag.set_ylabel("Magnitude")
+    ax_mag.set_facecolor("#161b22")
+    ax_mag.legend(loc="upper right", framealpha=0.3)
+    ax_mag.grid(alpha=0.15)
+    ax_mag.set_title(
+        "Overlay: DUT samples on golden magnitude spectrum",
+        fontsize=10,
+        color="#9198a1",
+    )
+
+    # Annotate the expected tone bins
+    for b in (TONE_BIN, NFFT - TONE_BIN):
+        ax_mag.axvline(b, color="#3fb950", ls="--", lw=0.8, alpha=0.6)
+        ax_mag.text(
+            b,
+            ax_mag.get_ylim()[1] * 0.9,
+            f"bin {b}",
+            color="#3fb950",
+            fontsize=8,
+            ha="center",
+        )
+
+    # Error subplot
+    ax_err.semilogy(bins, np.clip(err, 1e-9, None), color="#d29922", lw=1.0)
+    ax_err.set_ylabel("|error|")
+    ax_err.set_xlabel("Bin index k")
+    ax_err.set_facecolor("#161b22")
+    ax_err.grid(alpha=0.15)
+
+    for ax in (ax_mag, ax_err):
+        for spine in ax.spines.values():
+            spine.set_color("#30363d")
+
+    fig.tight_layout()
+    os.makedirs(PLOT_DIR, exist_ok=True)
+    out_path = os.path.join(PLOT_DIR, filename)
+    fig.savefig(out_path, dpi=150, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    logger.info("Saved overlay plot -> %s", out_path)
+    return out_path
+
+
+# ----------------------------------------------------------------------
+# Test
+# ----------------------------------------------------------------------
 @cocotb.test()
 async def test_fft_single_tone(dut):
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
@@ -119,76 +231,50 @@ async def test_fft_single_tone(dut):
 
     await reset_dut(dut)
 
-    drive_task = cocotb.start_soon(drive_input(dut, samples_q15))
-    outputs = await collect_outputs(dut, NFFT)
-    await drive_task
+    # FFT #1
+    await cocotb.start_soon(drive_input(dut, samples_q15))
 
-    assert len(outputs) == NFFT, f"Expected {NFFT} output beats, got {len(outputs)}"
+    # Core is ready for another frame
+    await RisingEdge(dut.o_tready)
+    logger.info("Starting FFT #2")
+
+    # Begin loading frame 2 while FFT #1 results drain out
+    await cocotb.start_soon(drive_input(dut, samples_q15))
+    outputs1 = await collect_outputs(dut, NFFT)
+
+    await RisingEdge(dut.o_tready)
 
     nbits = int(np.ceil(np.log2(NFFT)))
 
-    reported_indices = sorted(idx for idx, _, _ in outputs)
-    expected_indices = list(range(NFFT))
-    if reported_indices != expected_indices:
-        logger.error(f"o_xk_index values are NOT a clean permutation of 0..{NFFT - 1}.")
-        logger.error(f"Reported (sorted): {reported_indices}")
+    reported_indices = sorted(idx for idx, _, _ in outputs1)
+    assert reported_indices == list(range(NFFT)), (
+        "DUT did not emit every bin exactly once"
+    )
 
-    outputs_sorted = sorted(outputs, key=lambda t: t[0])
+    outputs_sorted = sorted(outputs1, key=lambda t: t[0])
 
     golden_natural = golden
     golden_bitrev = np.array([golden[bit_reverse_index(i, nbits)] for i in range(NFFT)])
 
-    err_re_nat, err_im_nat, errs_nat = score_against(
-        outputs_sorted, golden_natural, "vs natural-order golden"
+    err_re_nat, err_im_nat, _ = score_against(
+        outputs_sorted, golden_natural, "FFT1 natural"
     )
-    err_re_rev, err_im_rev, errs_rev = score_against(
-        outputs_sorted, golden_bitrev, "vs bit-reversed-order golden"
+    err_re_rev, err_im_rev, _ = score_against(
+        outputs_sorted, golden_bitrev, "FFT1 bitrev"
     )
 
-    # Real- and imaginary-part errors are reported separately (not just
-    # combined) because of the known i_yi/w_calculated_yr wiring bug in
-    # fft_top.sv -- if imaginary error is much larger than real error across
-    # the board, that wiring bug is almost certainly why, independent of
-    # whatever the bit-reversal answer turns out to be.
-    TOL = 0.02  # placeholder -- see note in module docstring / chat
+    # Plot against whichever ordering actually fits better — makes a
+    # bin-permutation bug obvious even before checking the assertion.
+    natural_is_better = (err_re_nat + err_im_nat) <= (err_re_rev + err_im_rev)
+    best_label = "natural order" if natural_is_better else "bit-reversed order"
+    best_golden = golden_natural if natural_is_better else golden_bitrev
 
-    nat_pass = err_re_nat <= TOL and err_im_nat <= TOL
-    rev_pass = err_re_rev <= TOL and err_im_rev <= TOL
+    plot_overlay(outputs_sorted, best_golden, best_label, "fft1_overlay.png")
 
-    if nat_pass and not rev_pass:
-        logger.info("RESULT: output matches NATURAL bin order.")
-    elif rev_pass and not nat_pass:
-        logger.info(
-            "RESULT: output matches BIT-REVERSED bin order -- "
-            "bit_reversal_unit is not reversing as expected; data is "
-            "landing in bit-reversed slots."
-        )
-    elif nat_pass and rev_pass:
-        logger.info("RESULT: ambiguous -- matches both within tolerance.")
-    else:
-        logger.error("RESULT: matches NEITHER ordering within tolerance.")
-        if err_im_nat > 3 * max(err_re_nat, 1e-6) and err_im_rev > 3 * max(
-            err_re_rev, 1e-6
-        ):
-            logger.error(
-                "Imaginary error is much larger than real error under BOTH "
-                "orderings -- strongly suggests the known i_yi/w_calculated_yr "
-                "wiring bug in fft_top.sv's memory_bank_wrapper instantiation "
-                "is the dominant cause, not bin ordering."
-            )
-        logger.error("Per-bin detail (natural-order comparison):")
-        for idx, actual, g, e_re, e_im in errs_nat:
-            logger.error(
-                f"  reported_idx={idx:3d} actual={actual:.4f} "
-                f"expected={g:.4f} err=({e_re:.4f},{e_im:.4f})"
-            )
-
-    await ClockCycles(dut.clk, 2000)
-    # assert reported_indices == expected_indices, (
-    #     "o_xk_index outputs are not a clean permutation of all bins."
-    # )
-    # assert nat_pass or rev_pass, (
-    #     f"Output matched neither ordering within tolerance "
-    #     f"(nat=({err_re_nat:.4f},{err_im_nat:.4f}), "
-    #     f"rev=({err_re_rev:.4f},{err_im_rev:.4f})). See log for detail."
-    # )
+    TOL = 1e-2
+    assert min(err_re_nat, err_re_rev) < TOL, (
+        "Real part mismatch exceeds tolerance in both orderings"
+    )
+    assert min(err_im_nat, err_im_rev) < TOL, (
+        "Imag part mismatch exceeds tolerance in both orderings"
+    )

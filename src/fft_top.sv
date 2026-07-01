@@ -1,7 +1,7 @@
 import fft::*;
 module fft_top #(
 
-    parameter int NFFT = 32,
+    parameter int NFFT = 1024,
     parameter int DATA_WIDTH = 16,
     parameter int QFORMAT = 15
 ) (

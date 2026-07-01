@@ -16,14 +16,7 @@ module bit_reversal_unit #(
 
   function automatic logic [DATA_DEPTH_LOG2-1:0] bit_reverse_vector(
       input logic [DATA_DEPTH_LOG2-1:0] a);
-
-    logic [DATA_DEPTH_LOG2-1:0] v_result;
-
-    for (int i = 0; i < DATA_DEPTH_LOG2; i++) begin
-      v_result[i] = a[i];
-    end
-
-    return v_result;
+    return {<<{a}};
   endfunction
 
   logic unsigned [DATA_DEPTH_LOG2-1:0] r_addr;
