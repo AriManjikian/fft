@@ -140,10 +140,10 @@ module memory_bank_wrapper #(
 
       if (r_last_write_mem_1) begin
         o_re <= w_data_out_1_xr;
-        o_im <= w_data_out_1_xi;
+        o_im <= -w_data_out_1_xi;
       end else begin
         o_re <= w_data_out_2_xr;
-        o_im <= w_data_out_2_xi;
+        o_im <= -w_data_out_2_xi;
       end
     end
   end
