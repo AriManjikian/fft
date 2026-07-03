@@ -1,6 +1,6 @@
 module complex_mult #(
-    parameter int DATA_WIDTH_A = 16,
-    parameter int DATA_WIDTH_B = 16
+    parameter int DATA_WIDTH_A = fft::DATA_WIDTH,
+    parameter int DATA_WIDTH_B = fft::DATA_WIDTH
 ) (
     input logic clk,
     // Input A

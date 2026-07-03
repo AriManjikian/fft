@@ -1,6 +1,6 @@
 module tpd_bram #(
-    parameter int DATA_DEPTH = 1024,
-    parameter int DATA_WIDTH = 16
+    parameter int DATA_DEPTH = fft::DATA_DEPTH,
+    parameter int DATA_WIDTH = fft::DATA_WIDTH
 ) (
     input logic i_clka,
     input logic i_clkb,

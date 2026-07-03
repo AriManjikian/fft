@@ -1,6 +1,6 @@
 module twiddle_rom #(
-    parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH = 1024,
+    parameter int DATA_WIDTH = fft::DATA_WIDTH,
+    parameter int DATA_DEPTH = fft::DATA_DEPTH,
     parameter string INIT_FILE = ""
 ) (
     input logic clk,

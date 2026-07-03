@@ -1,7 +1,7 @@
 import fft::*;
 
 module agu #(
-    parameter int DATA_DEPTH_LOG2 = 10
+    parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
     input logic clk,
     input logic i_start,

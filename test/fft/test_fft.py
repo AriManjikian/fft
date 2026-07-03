@@ -1,6 +1,5 @@
 import logging
 import os
-
 import cocotb
 import numpy as np
 from cocotb.clock import Clock
@@ -14,24 +13,19 @@ NFFT = 1024
 DATA_WIDTH = 16
 QFORMAT = 15
 SCALE = 1 << QFORMAT
-
 CLK_PERIOD_NS = 5
 TIMEOUT_CYCLES = 5000
-
 DEFAULT_TOL = 1e-1
-
-MIN_TONES = 1
-MAX_TONES = 10
+MIN_TONES = 10
+MAX_TONES = 20
 AMPLITUDE_HEADROOM = 0.85
-
 GOLDEN_SCALE = 1 / NFFT
 
 
 # ----------------------------------------------------------------------
-# fixed-point helpers
+# helpers
 # ----------------------------------------------------------------------
 def to_q15(value: float) -> int:
-    """Round a float to Q1.15 and saturate to the representable range."""
     q = int(round(value * SCALE))
     return max(-SCALE, min(SCALE - 1, q))
 
@@ -46,6 +40,49 @@ def get_seed() -> int:
 
 def get_tolerance() -> float:
     return DEFAULT_TOL
+
+
+async def _run_fft_test(dut, seed, tol):
+    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    rng = np.random.default_rng(seed)
+    time_domain_re, golden, tones = make_random_test_vector(NFFT, rng)
+    time_domain_im = np.zeros_like(time_domain_re)
+    samples_q15 = list(
+        zip(
+            (to_q15(v) for v in time_domain_re),
+            (to_q15(v) for v in time_domain_im),
+        )
+    )
+
+    await reset_dut(dut)
+
+    # fft #1
+    await cocotb.start_soon(drive_input(dut, samples_q15))
+    await RisingEdge(dut.o_tready)
+    logger.info("starting fft #2")
+    await cocotb.start_soon(drive_input(dut, samples_q15))
+    outputs1 = await collect_outputs(dut, NFFT)
+    await RisingEdge(dut.o_tready)
+
+    reported_indices = sorted(idx for idx, _, _ in outputs1)
+    assert reported_indices == list(range(NFFT)), (
+        "dut did not emit every bin exactly once"
+    )
+
+    outputs_sorted = sorted(outputs1, key=lambda t: t[0])
+
+    max_err_re, max_err_im, results, failing = score_against(
+        outputs_sorted, golden, tol, "fft1"
+    )
+
+    if failing:
+        worst = failing[0]
+        failure_summary = (
+            f"{len(failing)}/{NFFT} bin(s) exceeded tolerance {tol:.1e} "
+            f"(seed={seed}); worst bin={worst['idx']} "
+            f"err_re={worst['err_re']:.5f} err_im={worst['err_im']:.5f}"
+        )
+        assert not failing, failure_summary
 
 
 # ----------------------------------------------------------------------
@@ -191,10 +228,6 @@ def score_against(outputs_sorted, golden, tol, label):
                 r["err_re"],
                 r["err_im"],
             )
-        remaining = len(failing)
-        if remaining > 0:
-            logger.error("  ... and %d more (see plot for full picture)", remaining)
-
     return max_re, max_im, results, failing
 
 
@@ -204,7 +237,7 @@ async def _run_fft_test(dut, seed, tol):
     rng = np.random.default_rng(seed)
 
     time_domain_re, golden, tones = make_random_test_vector(NFFT, rng)
-    time_domain_im = np.zeros_like(time_domain_re)
+    time_domain_im, golen_im, tones_im = make_random_test_vector(NFFT, rng)
     samples_q15 = list(
         zip(
             (to_q15(v) for v in time_domain_re),
@@ -257,10 +290,5 @@ async def _run_fft_test(dut, seed, tol):
 async def test_fft_random_tones(dut):
     seed = get_seed()
     tol = get_tolerance()
-    logger.info(
-        "using seed=%d , tolerance=%.1e",
-        seed,
-        tol,
-    )
-
+    logger.info("using seed=%d , tolerance=%.1e", seed, tol)
     await _run_fft_test(dut, seed, tol)

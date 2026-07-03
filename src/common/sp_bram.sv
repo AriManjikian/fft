@@ -1,6 +1,6 @@
 module sp_bram #(
-    parameter int RAM_WIDTH = 16,
-    parameter int RAM_DEPTH_BITS = 10
+    parameter int RAM_WIDTH = fft::DATA_DEPTH,
+    parameter int RAM_DEPTH_BITS = $clog2(fft::DATA_DEPTH)
 ) (
     input logic clk,
     input logic [RAM_DEPTH_BITS-1:0] i_addr,

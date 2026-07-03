@@ -1,5 +1,5 @@
 module complex_adder #(
-    parameter int DATA_WIDTH = 16
+    parameter int DATA_WIDTH = fft::DATA_WIDTH
 ) (
     input logic clk,
     input logic signed [DATA_WIDTH-1:0] i_ar,

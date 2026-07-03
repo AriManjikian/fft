@@ -1,6 +1,6 @@
 module memory_bank #(
-    parameter int DATA_WIDTH = 16,
-    parameter int DATA_DEPTH_LOG2 = 10
+    parameter int DATA_WIDTH = fft::DATA_WIDTH,
+    parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
     input logic clk,
 

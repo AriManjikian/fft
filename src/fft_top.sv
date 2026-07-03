@@ -1,9 +1,9 @@
 import fft::*;
 module fft_top #(
 
-    parameter int NFFT = 1024,
-    parameter int DATA_WIDTH = 16,
-    parameter int QFORMAT = 15
+    parameter int NFFT = fft::NFFT,
+    parameter int DATA_WIDTH = fft::DATA_WIDTH,
+    parameter int QFORMAT = fft::QFORMAT
 ) (
     input logic clk,
     input logic reset,

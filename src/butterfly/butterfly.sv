@@ -1,6 +1,6 @@
 module butterfly #(
-    parameter int DATA_WIDTH  = 16,
-    parameter int DATA_FORMAT = 15
+    parameter int DATA_WIDTH  = fft::DATA_WIDTH,
+    parameter int DATA_FORMAT = fft::QFORMAT
 ) (
     input logic clk,
     // Input A
