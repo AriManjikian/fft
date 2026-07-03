@@ -2,9 +2,13 @@ import logging
 import os
 import cocotb
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
 from cocotb.clock import Clock
 from cocotb.result import SimTimeoutError
 from cocotb.triggers import RisingEdge, ClockCycles
+
+matplotlib.use("TkAgg")
 
 logger = logging.getLogger("cocotb")
 logger.setLevel(logging.DEBUG)
@@ -40,49 +44,6 @@ def get_seed() -> int:
 
 def get_tolerance() -> float:
     return DEFAULT_TOL
-
-
-async def _run_fft_test(dut, seed, tol):
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
-    rng = np.random.default_rng(seed)
-    time_domain_re, golden, tones = make_random_test_vector(NFFT, rng)
-    time_domain_im = np.zeros_like(time_domain_re)
-    samples_q15 = list(
-        zip(
-            (to_q15(v) for v in time_domain_re),
-            (to_q15(v) for v in time_domain_im),
-        )
-    )
-
-    await reset_dut(dut)
-
-    # fft #1
-    await cocotb.start_soon(drive_input(dut, samples_q15))
-    await RisingEdge(dut.o_tready)
-    logger.info("starting fft #2")
-    await cocotb.start_soon(drive_input(dut, samples_q15))
-    outputs1 = await collect_outputs(dut, NFFT)
-    await RisingEdge(dut.o_tready)
-
-    reported_indices = sorted(idx for idx, _, _ in outputs1)
-    assert reported_indices == list(range(NFFT)), (
-        "dut did not emit every bin exactly once"
-    )
-
-    outputs_sorted = sorted(outputs1, key=lambda t: t[0])
-
-    max_err_re, max_err_im, results, failing = score_against(
-        outputs_sorted, golden, tol, "fft1"
-    )
-
-    if failing:
-        worst = failing[0]
-        failure_summary = (
-            f"{len(failing)}/{NFFT} bin(s) exceeded tolerance {tol:.1e} "
-            f"(seed={seed}); worst bin={worst['idx']} "
-            f"err_re={worst['err_re']:.5f} err_im={worst['err_im']:.5f}"
-        )
-        assert not failing, failure_summary
 
 
 # ----------------------------------------------------------------------
@@ -231,13 +192,99 @@ def score_against(outputs_sorted, golden, tol, label):
     return max_re, max_im, results, failing
 
 
+# ----------------------------------------------------------------------
+# plotting
+# ----------------------------------------------------------------------
+def plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, seed):
+    nfft = len(golden)
+    bins = np.arange(nfft)
+
+    dut_re = np.full(nfft, np.nan)
+    dut_im = np.full(nfft, np.nan)
+    for idx, re_q, im_q in outputs_sorted:
+        dut_re[idx] = from_q15(re_q)
+        dut_im[idx] = from_q15(im_q)
+
+    golden_re = golden.real
+    golden_im = golden.imag
+
+    err_re = dut_re - golden_re
+    err_im = dut_im - golden_im
+
+    # normalize error to the pass/fail tolerance: +-1 is exactly the
+    # tolerance boundary used by score_against()/the test assertion
+    err_re_norm = err_re / tol
+    err_im_norm = err_im / tol
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    fig.suptitle(f"FFT test results (seed={seed}, NFFT={nfft})")
+
+    # --- panel 1: input samples ---
+    n = np.arange(len(time_domain_re))
+    axes[0].plot(n, time_domain_re, label="input (real)", linewidth=1)
+    axes[0].plot(n, time_domain_im, label="input (imag)", linewidth=1)
+    axes[0].set_title("Input time-domain samples")
+    axes[0].set_xlabel("sample n")
+    axes[0].set_ylabel("amplitude")
+    axes[0].legend(loc="upper right")
+    axes[0].grid(True, alpha=0.3)
+
+    # --- panel 2: golden vs dut overlay ---
+    (golden_re_line,) = axes[1].plot(
+        bins, golden_re, label="golden (real)", linewidth=1.2, marker="o", markersize=2
+    )
+    (dut_re_line,) = axes[1].plot(
+        bins, dut_re, "--", label="dut (real)", linewidth=1.0, marker="o", markersize=2
+    )
+    (golden_im_line,) = axes[1].plot(
+        bins, golden_im, label="golden (imag)", linewidth=1.2, marker="o", markersize=2
+    )
+    (dut_im_line,) = axes[1].plot(
+        bins, dut_im, "--", label="dut (imag)", linewidth=1.0, marker="o", markersize=2
+    )
+    axes[1].set_title("Golden vs DUT FFT output")
+    axes[1].set_xlabel("bin index")
+    axes[1].set_ylabel("magnitude")
+    axes[1].legend(loc="upper right", ncol=2)
+    axes[1].grid(True, alpha=0.3)
+
+    # --- panel 3: error, normalized to tolerance ---
+    (err_re_raw_line,) = axes[2].plot(
+        bins, err_re, label="err (real)", linewidth=1, marker="o", markersize=2
+    )
+    (err_im_raw_line,) = axes[2].plot(
+        bins, err_im, label="err (imag)", linewidth=1, marker="o", markersize=2
+    )
+    axes[2].axhline(tol, color="r", linestyle=":", linewidth=1, label="+tol")
+    axes[2].axhline(-tol, color="r", linestyle=":", linewidth=1, label="-tol")
+    axes[2].set_title(f"Raw error (dut - golden); tol={tol:.1e}; hover for values")
+    axes[2].set_xlabel("bin index")
+    axes[2].set_ylabel("error")
+    axes[2].legend(loc="upper right", ncol=2)
+    axes[2].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ----------------------------------------------------------------------
+# test body
+# ----------------------------------------------------------------------
 async def _run_fft_test(dut, seed, tol):
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
 
     rng = np.random.default_rng(seed)
 
-    time_domain_re, golden, tones = make_random_test_vector(NFFT, rng)
-    time_domain_im, golen_im, tones_im = make_random_test_vector(NFFT, rng)
+    time_domain_re, _golden_re_only, tones = make_random_test_vector(NFFT, rng)
+    time_domain_im, _golden_im_only, tones_im = make_random_test_vector(NFFT, rng)
+
+    # the DUT is fed a genuinely complex signal (re + j*im), so golden must
+    # be the FFT of that complex signal too - NOT fft(re) alone. fft(re) and
+    # fft(im) individually are conjugate-symmetric (since re/im are each
+    # real-valued), which is why using fft(re) alone as golden produces
+    # spurious errors mirrored around bin k <-> NFFT-k.
+    golden = np.fft.fft(time_domain_re + 1j * time_domain_im) * GOLDEN_SCALE
+
     samples_q15 = list(
         zip(
             (to_q15(v) for v in time_domain_re),
@@ -270,6 +317,8 @@ async def _run_fft_test(dut, seed, tol):
     max_err_re, max_err_im, results, failing = score_against(
         outputs_sorted, golden, tol, "fft1"
     )
+
+    plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, seed)
 
     if failing:
         worst = failing[0]

@@ -12,6 +12,8 @@ EXTRA_ARGS += \
 WAVES = 1
 
 VERILOG_SOURCES += $(PWD)/../../src/butterfly/butterfly.sv
+VERILOG_SOURCES += $(PWD)/../../src/common/complex_mult.sv
+VERILOG_SOURCES += $(PWD)/../../src/common/complex_adder.sv
 VERILOG_SOURCES += $(PWD)/../../src/fft_pkg.sv
 
 TOPLEVEL = butterfly
