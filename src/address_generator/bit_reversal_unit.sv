@@ -1,6 +1,6 @@
 module bit_reversal_unit #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH,
-    parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH) + 1
+    parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
     input clk,
     input reset,

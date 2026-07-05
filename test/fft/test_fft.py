@@ -13,28 +13,28 @@ matplotlib.use("TkAgg")
 logger = logging.getLogger("cocotb")
 logger.setLevel(logging.DEBUG)
 
-NFFT = 1024
-DATA_WIDTH = 16
-QFORMAT = 15
-SCALE = 1 << QFORMAT
-CLK_PERIOD_NS = 5
+NFFT = DATA_WIDTH = QFORMAT = SCALE = GOLDEN_SCALE = 0
+
 TIMEOUT_CYCLES = 5000
-DEFAULT_TOL = 1e-1
-MIN_TONES = 10
+DEFAULT_TOL = 3e-4
+MIN_TONES = 1
 MAX_TONES = 20
 AMPLITUDE_HEADROOM = 0.85
-GOLDEN_SCALE = 1 / NFFT
+
+PLOT_RESULTS = os.environ.get("PLOT", "0") == "1"
 
 
 # ----------------------------------------------------------------------
 # helpers
 # ----------------------------------------------------------------------
-def to_q15(value: float) -> int:
+def to_fixed(value):
+    max_val = (1 << (DATA_WIDTH - 1)) - 1
+    min_val = -(1 << (DATA_WIDTH - 1))
     q = int(round(value * SCALE))
-    return max(-SCALE, min(SCALE - 1, q))
+    return max(min_val, min(max_val, q))
 
 
-def from_q15(value: int) -> float:
+def from_fixed(value):
     return value / SCALE
 
 
@@ -122,9 +122,9 @@ async def collect_outputs(dut, expected_count):
                 expected_count,
                 idx,
                 re,
-                from_q15(re),
+                from_fixed(re),
                 im,
-                from_q15(im),
+                from_fixed(im),
             )
 
         if cycles_since_last > TIMEOUT_CYCLES:
@@ -142,7 +142,7 @@ async def collect_outputs(dut, expected_count):
 def score_against(outputs_sorted, golden, tol, label):
     results = []
     for idx, re_q, im_q in outputs_sorted:
-        actual = complex(from_q15(re_q), from_q15(im_q))
+        actual = complex(from_fixed(re_q), from_fixed(im_q))
         g = complex(golden[idx])
         err_re = abs(actual.real - g.real)
         err_im = abs(actual.imag - g.imag)
@@ -202,19 +202,14 @@ def plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, se
     dut_re = np.full(nfft, np.nan)
     dut_im = np.full(nfft, np.nan)
     for idx, re_q, im_q in outputs_sorted:
-        dut_re[idx] = from_q15(re_q)
-        dut_im[idx] = from_q15(im_q)
+        dut_re[idx] = from_fixed(re_q)
+        dut_im[idx] = from_fixed(im_q)
 
     golden_re = golden.real
     golden_im = golden.imag
 
     err_re = dut_re - golden_re
     err_im = dut_im - golden_im
-
-    # normalize error to the pass/fail tolerance: +-1 is exactly the
-    # tolerance boundary used by score_against()/the test assertion
-    err_re_norm = err_re / tol
-    err_im_norm = err_im / tol
 
     fig, axes = plt.subplots(3, 1, figsize=(12, 10))
     fig.suptitle(f"FFT test results (seed={seed}, NFFT={nfft})")
@@ -267,10 +262,20 @@ def plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, se
     plt.show()
 
 
-# ----------------------------------------------------------------------
-# test body
-# ----------------------------------------------------------------------
-async def _run_fft_test(dut, seed, tol):
+@cocotb.test()
+async def test_fft_random_tones(dut):
+    global NFFT, DATA_WIDTH, QFORMAT, SCALE, GOLDEN_SCALE
+    NFFT = int(dut.NFFT.value)
+    DATA_WIDTH = int(dut.DATA_WIDTH.value)
+    QFORMAT = int(dut.QFORMAT.value)
+
+    SCALE = 1 << QFORMAT
+    GOLDEN_SCALE = 1 / NFFT
+    seed = get_seed()
+    tol = get_tolerance()
+    logger.info("using seed=%d , tolerance=%.1e", seed, tol)
+
+    CLK_PERIOD_NS = 10
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
 
     rng = np.random.default_rng(seed)
@@ -278,17 +283,12 @@ async def _run_fft_test(dut, seed, tol):
     time_domain_re, _golden_re_only, tones = make_random_test_vector(NFFT, rng)
     time_domain_im, _golden_im_only, tones_im = make_random_test_vector(NFFT, rng)
 
-    # the DUT is fed a genuinely complex signal (re + j*im), so golden must
-    # be the FFT of that complex signal too - NOT fft(re) alone. fft(re) and
-    # fft(im) individually are conjugate-symmetric (since re/im are each
-    # real-valued), which is why using fft(re) alone as golden produces
-    # spurious errors mirrored around bin k <-> NFFT-k.
     golden = np.fft.fft(time_domain_re + 1j * time_domain_im) * GOLDEN_SCALE
 
     samples_q15 = list(
         zip(
-            (to_q15(v) for v in time_domain_re),
-            (to_q15(v) for v in time_domain_im),
+            (to_fixed(v) for v in time_domain_re),
+            (to_fixed(v) for v in time_domain_im),
         )
     )
 
@@ -318,7 +318,8 @@ async def _run_fft_test(dut, seed, tol):
         outputs_sorted, golden, tol, "fft1"
     )
 
-    plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, seed)
+    if PLOT_RESULTS:
+        plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, seed)
 
     if failing:
         worst = failing[0]
@@ -330,14 +331,3 @@ async def _run_fft_test(dut, seed, tol):
             f"{' ...' if len(failing) > 15 else ''}"
         )
         assert not failing, failure_summary
-
-
-# ----------------------------------------------------------------------
-# test
-# ----------------------------------------------------------------------
-@cocotb.test()
-async def test_fft_random_tones(dut):
-    seed = get_seed()
-    tol = get_tolerance()
-    logger.info("using seed=%d , tolerance=%.1e", seed, tol)
-    await _run_fft_test(dut, seed, tol)

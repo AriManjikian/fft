@@ -4,12 +4,6 @@ import random
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
-CLK_PERIOD_NS = 40
-
-WIDTH_A = 16
-WIDTH_B = 16
-OUT_WIDTH = max(WIDTH_A, WIDTH_B) + 1
-
 
 def rand_signed(width):
     return random.randint(-(1 << (width - 1)), (1 << (width - 1)) - 1)
@@ -27,7 +21,12 @@ def wrap_signed(value, width):
 
 @cocotb.test()
 async def basic(dut):
+    CLK_PERIOD_NS = 10
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+
+    WIDTH_A = int(dut.DATA_WIDTH.value)
+    WIDTH_B = int(dut.DATA_WIDTH.value)
+    OUT_WIDTH = max(WIDTH_A, WIDTH_B) + 1
 
     await ClockCycles(dut.clk, 1)
 
@@ -62,7 +61,12 @@ async def basic(dut):
 
 @cocotb.test()
 async def overflow(dut):
+    CLK_PERIOD_NS = 10
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+
+    WIDTH_A = int(dut.DATA_WIDTH.value)
+    WIDTH_B = int(dut.DATA_WIDTH.value)
+    OUT_WIDTH = max(WIDTH_A, WIDTH_B) + 1
 
     #
     # Large negative (-1)

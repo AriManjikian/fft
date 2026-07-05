@@ -4,13 +4,6 @@ import random
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
-CLK_PERIOD_NS = 40
-LATENCY = 6
-
-G_WIDTH_A = 8
-G_WIDTH_B = 8
-OUT_WIDTH = G_WIDTH_A + G_WIDTH_B + 1
-
 
 def rand_signed(width):
     return random.randint(-(1 << (width - 1)), (1 << (width - 1)) - 1)
@@ -28,15 +21,21 @@ def wrap_signed(value, width):
 
 @cocotb.test()
 async def basic(dut):
+    CLK_PERIOD_NS = 10
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+
+    WIDTH_A = int(dut.DATA_WIDTH_A.value)
+    WIDTH_B = int(dut.DATA_WIDTH_B.value)
+    OUT_WIDTH = WIDTH_A + WIDTH_B + 1
+    LATENCY = 6
 
     await ClockCycles(dut.clk, 1)
 
     for _ in range(100):
-        ar = rand_signed(G_WIDTH_A)
-        ai = rand_signed(G_WIDTH_A)
-        br = rand_signed(G_WIDTH_B)
-        bi = rand_signed(G_WIDTH_B)
+        ar = rand_signed(WIDTH_A)
+        ai = rand_signed(WIDTH_A)
+        br = rand_signed(WIDTH_B)
+        bi = rand_signed(WIDTH_B)
 
         dut.i_ar.value = ar
         dut.i_ai.value = ai
@@ -61,7 +60,13 @@ async def basic(dut):
 
 @cocotb.test()
 async def overflow(dut):
+    CLK_PERIOD_NS = 10
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+
+    WIDTH_A = int(dut.DATA_WIDTH_A.value)
+    WIDTH_B = int(dut.DATA_WIDTH_B.value)
+    OUT_WIDTH = WIDTH_A + WIDTH_B + 1
+    LATENCY = 6
 
     #
     # Large negative (-1)
@@ -87,10 +92,10 @@ async def overflow(dut):
     #
     # Large positive (01111111 = +127)
     #
-    ar = (1 << (G_WIDTH_A - 1)) - 1
-    ai = (1 << (G_WIDTH_A - 1)) - 1
-    br = (1 << (G_WIDTH_B - 1)) - 1
-    bi = (1 << (G_WIDTH_B - 1)) - 1
+    ar = (1 << (WIDTH_A - 1)) - 1
+    ai = (1 << (WIDTH_A - 1)) - 1
+    br = (1 << (WIDTH_B - 1)) - 1
+    bi = (1 << (WIDTH_B - 1)) - 1
 
     dut.i_ar.value = ar
     dut.i_ai.value = ai

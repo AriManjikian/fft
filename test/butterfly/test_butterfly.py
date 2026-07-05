@@ -3,10 +3,6 @@ import random
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
-G_DATA_WIDTH = 16
-G_QFORMAT = 15
-LATENCY = 9
-
 
 def rand(width):
     val = random.getrandbits(width)
@@ -40,26 +36,31 @@ def butterfly_model(ar, ai, br, bi, tr, ti, q):
 
 @cocotb.test()
 async def test_radix2_random(dut):
-    cocotb.start_soon(Clock(dut.clk, 5, unit="ns").start())
+    CLK_PERIOD_NS = 10
+    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+
+    DATA_WIDTH = int(dut.DATA_WIDTH.value)
+    QFORMAT = int(dut.DATA_FORMAT.value)
+    LATENCY = 9
 
     for _ in range(10):
-        ar = rand(G_DATA_WIDTH)
-        ai = rand(G_DATA_WIDTH)
-        br = rand(G_DATA_WIDTH)
-        bi = rand(G_DATA_WIDTH)
-        tr = rand(G_DATA_WIDTH)
-        ti = rand(G_DATA_WIDTH)
+        ar = rand(DATA_WIDTH)
+        ai = rand(DATA_WIDTH)
+        br = rand(DATA_WIDTH)
+        bi = rand(DATA_WIDTH)
+        tr = rand(DATA_WIDTH)
+        ti = rand(DATA_WIDTH)
 
-        dut.i_ar.value = ar & ((1 << G_DATA_WIDTH) - 1)
-        dut.i_ai.value = ai & ((1 << G_DATA_WIDTH) - 1)
-        dut.i_br.value = br & ((1 << G_DATA_WIDTH) - 1)
-        dut.i_bi.value = bi & ((1 << G_DATA_WIDTH) - 1)
-        dut.i_tr.value = tr & ((1 << G_DATA_WIDTH) - 1)
-        dut.i_ti.value = ti & ((1 << G_DATA_WIDTH) - 1)
+        dut.i_ar.value = ar & ((1 << DATA_WIDTH) - 1)
+        dut.i_ai.value = ai & ((1 << DATA_WIDTH) - 1)
+        dut.i_br.value = br & ((1 << DATA_WIDTH) - 1)
+        dut.i_bi.value = bi & ((1 << DATA_WIDTH) - 1)
+        dut.i_tr.value = tr & ((1 << DATA_WIDTH) - 1)
+        dut.i_ti.value = ti & ((1 << DATA_WIDTH) - 1)
 
         await ClockCycles(dut.clk, LATENCY)
 
-        xr, xi, yr, yi = butterfly_model(ar, ai, br, bi, tr, ti, G_QFORMAT)
+        xr, xi, yr, yi = butterfly_model(ar, ai, br, bi, tr, ti, QFORMAT)
 
         dut_xr = int(dut.o_xr.value.to_signed())
         dut_xi = int(dut.o_xi.value.to_signed())

@@ -2,8 +2,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles
 
-DATA_DEPTH_LOG2 = 5
-
 
 def f_mem_addr_A(level_i, index_j, data_depth_log2):
     mask = (1 << data_depth_log2) - 1
@@ -41,7 +39,10 @@ async def f_assert_start(dut):
 
 @cocotb.test()
 async def test_agu(dut):
-    cocotb.start_soon(Clock(dut.clk, 5, unit="ns").start())
+    CLK_PERIOD_NS = 10
+    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+
+    DATA_DEPTH_LOG2 = int(dut.DATA_DEPTH_LOG2.value)
 
     await f_assert_start(dut)
 

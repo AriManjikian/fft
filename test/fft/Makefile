@@ -1,7 +1,6 @@
 # Makefile
 SIM ?= verilator
 TOPLEVEL_LANG ?= verilog
-
 EXTRA_ARGS += \
     --trace \
     --trace-structs \
@@ -30,16 +29,18 @@ MODULE = test_fft
 
 PROJECT_ROOT := $(abspath $(CURDIR)/../..)
 PLUSARGS += +BASE_PATH=$(PROJECT_ROOT)/scripts/twiddle_factors
+
+PLOT ?= 0
+export PLOT
+
 include $(shell cocotb-config --makefiles)/Makefile.sim
-
-.PHONY: build test run
-
+.PHONY: build test run plot
 build:
 	$(MAKE) sim
-
 test:
 	$(MAKE)
-
 run:
 	$(MAKE)
 	gtkwave dump.vcd &
+plot:
+	$(MAKE) PLOT=1

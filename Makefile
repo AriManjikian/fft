@@ -1,9 +1,7 @@
-.PHONY: all address_generator butterfly complex_adder complex_mult fft
-
-all: clean test
+.PHONY: address_generator butterfly complex_adder complex_mult fft test
 
 test:
-	. .venv/bin/activate && $(MAKE) address_generator butterfly complex_adder complex_mult fft
+	. venv/bin/activate && $(MAKE) address_generator butterfly complex_adder complex_mult fft
 
 address_generator:
 	$(MAKE) -C test/address_generator
