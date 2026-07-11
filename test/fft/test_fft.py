@@ -158,19 +158,19 @@ async def reset_dut(dut):
     dut.i_tvalid.value = 0
     dut.i_tdata_re.value = 0
     dut.i_tdata_im.value = 0
-    await ClockCycles(dut.clk, 5)
+    await ClockCycles(dut.i_Clk, 5)
     dut.reset.value = 0
-    await RisingEdge(dut.clk)
+    await RisingEdge(dut.i_Clk)
 
 
 async def drive_input(dut, samples_q15):
     for i, (re_q, im_q) in enumerate(samples_q15):
         while not dut.o_tready.value:
-            await RisingEdge(dut.clk)
+            await RisingEdge(dut.i_Clk)
         dut.i_tdata_re.value = re_q
         dut.i_tdata_im.value = im_q
         dut.i_tvalid.value = 1
-        await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_Clk)
         dut.i_tvalid.value = 0
         logger.debug("drove sample %d: re=%d im=%d", i, re_q, im_q)
 
@@ -180,7 +180,7 @@ async def collect_outputs(dut, expected_count):
     cycles_since_last = 0
 
     while len(outputs) < expected_count:
-        await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_Clk)
         cycles_since_last += 1
 
         if dut.o_tvalid.value:
@@ -374,7 +374,7 @@ async def _setup_dut_and_clock(dut):
     GOLDEN_SCALE = 1 / NFFT
 
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
 
 async def _run_two_frame_test(

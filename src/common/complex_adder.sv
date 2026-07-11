@@ -1,7 +1,7 @@
 module complex_adder #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH
 ) (
-    input logic clk,
+    input logic i_Clk,
     input logic signed [DATA_WIDTH-1:0] i_ar,
     input logic signed [DATA_WIDTH-1:0] i_ai,
     input logic signed [DATA_WIDTH-1:0] i_br,
@@ -14,7 +14,7 @@ module complex_adder #(
   logic signed [DATA_WIDTH:0] r_ci_signed;
 
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
 
     r_cr_signed <= $signed({i_ar[DATA_WIDTH-1], i_ar}) + $signed({i_br[DATA_WIDTH-1], i_br});
 

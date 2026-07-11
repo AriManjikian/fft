@@ -2,7 +2,7 @@ module memory_bank_wrapper #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH,
     parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
-    input logic clk,
+    input logic i_Clk,
     // Control
     input logic i_bank_select,
     input logic i_load_unload,
@@ -65,7 +65,7 @@ module memory_bank_wrapper #(
   logic [DATA_DEPTH_LOG2-1:0] r_index_out_pipeline[0:1] = '{default: '0};
 
   // addr mux
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (i_bank_select) begin
       // Read Bank 1
       r_addr_1_X <= i_rd_addr_X;
@@ -97,7 +97,7 @@ module memory_bank_wrapper #(
   end
 
   // data_in mux
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_data_in_1_xr <= i_xr;
     r_data_in_1_xi <= i_xi;
     r_data_in_1_yr <= i_yr;
@@ -123,7 +123,7 @@ module memory_bank_wrapper #(
   end
 
   // data_out mux
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (i_bank_select) begin
       o_xr <= w_data_out_1_xr;
       o_xi <= w_data_out_1_xi;
@@ -149,7 +149,7 @@ module memory_bank_wrapper #(
   end
 
   // data_wren mux
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_wren_1_X <= i_wren_1;
     r_wren_1_Y <= i_wren_1;
     r_wren_2_X <= i_wren_2;
@@ -164,7 +164,7 @@ module memory_bank_wrapper #(
   end
 
   // track_last_write
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (r_wren_1_Y) begin
       r_last_write_mem_1 <= 1'b1;
     end else if (r_wren_2_Y) begin
@@ -173,7 +173,7 @@ module memory_bank_wrapper #(
   end
 
   // pipeline
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_load_unload_pipeline  <= {r_load_unload_pipeline[0], i_load_unload};
 
     r_index_out_pipeline[0] <= r_index_out_pipeline[1];
@@ -185,7 +185,7 @@ module memory_bank_wrapper #(
       .DATA_WIDTH     (DATA_WIDTH  /* default 16 */),
       .DATA_DEPTH_LOG2(DATA_DEPTH_LOG2  /* default 5 */)
   ) memory_bank_1_inst (
-      .clk        (clk),
+      .i_Clk        (i_Clk),
       .i_wren_re_A(r_wren_1_X),
       .i_wren_re_B(r_wren_1_Y),
       .i_addr_re_A(r_addr_1_X),
@@ -209,7 +209,7 @@ module memory_bank_wrapper #(
       .DATA_WIDTH     (DATA_WIDTH  /* default 16 */),
       .DATA_DEPTH_LOG2(DATA_DEPTH_LOG2  /* default 5 */)
   ) memory_bank_2_inst (
-      .clk        (clk),
+      .i_Clk        (i_Clk),
       .i_wren_re_A(r_wren_2_X),
       .i_wren_re_B(r_wren_2_Y),
       .i_addr_re_A(r_addr_2_X),

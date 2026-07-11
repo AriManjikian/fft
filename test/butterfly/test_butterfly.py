@@ -37,7 +37,7 @@ def butterfly_model(ar, ai, br, bi, tr, ti, q):
 @cocotb.test()
 async def test_radix2_random(dut):
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
     DATA_WIDTH = int(dut.DATA_WIDTH.value)
     QFORMAT = int(dut.DATA_FORMAT.value)
@@ -58,7 +58,7 @@ async def test_radix2_random(dut):
         dut.i_tr.value = tr & ((1 << DATA_WIDTH) - 1)
         dut.i_ti.value = ti & ((1 << DATA_WIDTH) - 1)
 
-        await ClockCycles(dut.clk, LATENCY)
+        await ClockCycles(dut.i_Clk, LATENCY)
 
         xr, xi, yr, yi = butterfly_model(ar, ai, br, bi, tr, ti, QFORMAT)
 

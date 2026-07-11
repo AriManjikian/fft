@@ -5,7 +5,7 @@ module fft_top #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH,
     parameter int QFORMAT = fft::QFORMAT
 ) (
-    input logic clk,
+    input logic i_Clk,
     input logic reset,
     input logic [DATA_WIDTH-1:0] i_tdata_re,
     input logic [DATA_WIDTH-1:0] i_tdata_im,
@@ -104,7 +104,7 @@ module fft_top #(
   assign o_tvalid = r_tvalid_out_pipeline[2];
 
   // FSM
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (reset) begin
       s_fft_state <= IDLE;
     end else begin
@@ -140,7 +140,7 @@ module fft_top #(
   end
 
   // FFT Control
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_buffer_tvalid_out <= '0;
     r_hold_counter <= '0;
     if (s_fft_state == IDLE) begin
@@ -170,13 +170,13 @@ module fft_top #(
   end
 
   // Edge detector
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_agu_wr_en <= w_agu_wr_en;
   end
   assign w_agu_wr_rising_edge = ~(r_agu_wr_en) && w_agu_wr_en;
 
   // Pipeline
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_wr_addr_mem_a_pipe[0] <= w_agu_rd_addr_a;
     r_wr_addr_mem_b_pipe[0] <= w_agu_rd_addr_b;
     for (int i = 1; i < C_BFU_LATENCY; i++) begin
@@ -205,7 +205,7 @@ module fft_top #(
   agu #(
       .DATA_DEPTH_LOG2(C_NFFT_LOG2  /* default 5 */)
   ) agu_inst (
-      .clk            (clk),
+      .i_Clk          (i_Clk),
       .i_start        (w_agu_start),
       .o_done         (w_agu_done),
       .o_wr_en        (w_agu_wr_en),
@@ -222,7 +222,7 @@ module fft_top #(
       .DATA_WIDTH     (DATA_WIDTH  /* default 16 */),
       .DATA_DEPTH_LOG2(C_NFFT_LOG2  /* default 5 */)
   ) memory_bank_wrapper_inst (
-      .clk               (clk),
+      .i_Clk             (i_Clk),
       .i_bank_select     (r_mem_select),
       .i_load_unload     (w_br_tvalid_out),
       .i_addr_load       (w_br_to_mb_addr_normal),
@@ -260,7 +260,7 @@ module fft_top #(
       .DATA_WIDTH(DATA_WIDTH),
       .DATA_DEPTH(NFFT)
   ) twiddle_rom_wrapper_inst (
-      .clk   (clk),
+      .i_Clk (i_Clk),
       .i_addr(r_rd_addr_twiddle_d2),
       .o_tr  (w_twiddle_tr),
       .o_ti  (w_twiddle_ti)
@@ -271,17 +271,17 @@ module fft_top #(
       .DATA_WIDTH (DATA_WIDTH  /* default 16 */),
       .DATA_FORMAT(QFORMAT  /* default 15 */)
   ) butterfly_inst (
-      .clk (clk),
-      .i_ar(w_stored_xr),
-      .i_ai(w_stored_xi),
-      .i_br(w_stored_yr),
-      .i_bi(w_stored_yi),
-      .i_tr(w_twiddle_tr),
-      .i_ti(w_twiddle_ti),
-      .o_xr(w_calculated_xr),
-      .o_xi(w_calculated_xi),
-      .o_yr(w_calculated_yr),
-      .o_yi(w_calculated_yi)
+      .i_Clk(i_Clk),
+      .i_ar (w_stored_xr),
+      .i_ai (w_stored_xi),
+      .i_br (w_stored_yr),
+      .i_bi (w_stored_yi),
+      .i_tr (w_twiddle_tr),
+      .i_ti (w_twiddle_ti),
+      .o_xr (w_calculated_xr),
+      .o_xi (w_calculated_xi),
+      .o_yr (w_calculated_yr),
+      .o_yi (w_calculated_yi)
   );
 
   // Bit Reversal Unit
@@ -289,7 +289,7 @@ module fft_top #(
       .DATA_WIDTH     (DATA_WIDTH  /* default 16 */),
       .DATA_DEPTH_LOG2(C_NFFT_LOG2  /* default 11 */)
   ) bit_reversal_unit_inst (
-      .clk             (clk),
+      .i_Clk           (i_Clk),
       .reset           (reset),
       .i_tdata_re      (w_buffer_re_out),
       .i_tdata_im      (w_buffer_im_out),
@@ -307,7 +307,7 @@ module fft_top #(
       .RAM_WIDTH     (2 * DATA_WIDTH),
       .RAM_DEPTH_BITS(C_NFFT_LOG2  /* default 5 */)
   ) input_buffer_inst (
-      .clk   (clk),
+      .i_Clk (i_Clk),
       .i_addr(r_input_buf_addr),
       .i_din (w_buffer_re_im_in),
       .i_we  (w_buffer_tvalid_in),

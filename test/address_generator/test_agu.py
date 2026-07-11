@@ -33,14 +33,14 @@ def f_mem_addr_BM(level_i, data_depth_log2):
 
 async def f_assert_start(dut):
     dut.i_start.value = 1
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
     dut.i_start.value = 0
 
 
 @cocotb.test()
 async def test_agu(dut):
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
     DATA_DEPTH_LOG2 = int(dut.DATA_DEPTH_LOG2.value)
 
@@ -48,7 +48,7 @@ async def test_agu(dut):
 
     await RisingEdge(dut.o_done)
 
-    await ClockCycles(dut.clk, 10)
+    await ClockCycles(dut.i_Clk, 10)
 
     await f_assert_start(dut)
 
@@ -58,7 +58,7 @@ async def test_agu(dut):
         dut._log.info(f"Starting level i={i}")
 
         for j in range(2 ** (DATA_DEPTH_LOG2 - 1)):
-            await ClockCycles(dut.clk, 1)
+            await ClockCycles(dut.i_Clk, 1)
 
             tb_expected_A = f_mem_addr_A(i, j, DATA_DEPTH_LOG2)
             tb_expected_B = f_mem_addr_B(i, j, DATA_DEPTH_LOG2)

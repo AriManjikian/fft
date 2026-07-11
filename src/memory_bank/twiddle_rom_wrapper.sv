@@ -2,7 +2,7 @@ module twiddle_rom_wrapper #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH,
     parameter int DATA_DEPTH = fft::DATA_DEPTH
 ) (
-    input logic clk,
+    input logic i_Clk,
     input logic [$clog2(DATA_DEPTH)-1:0] i_addr,
     output logic [DATA_WIDTH-1:0] o_tr,
     output logic [DATA_WIDTH-1:0] o_ti
@@ -39,7 +39,7 @@ module twiddle_rom_wrapper #(
     $readmemh(imag_file, rom_im);
   end
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     o_tr <= rom_re[i_addr];
     o_ti <= rom_im[i_addr];
   end

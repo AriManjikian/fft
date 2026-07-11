@@ -2,7 +2,7 @@ module memory_bank #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH,
     parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
-    input logic clk,
+    input logic i_Clk,
 
     input logic i_wren_re_A,
     input logic i_wren_re_B,
@@ -27,8 +27,8 @@ module memory_bank #(
       .DATA_DEPTH(2 ** DATA_DEPTH_LOG2),
       .DATA_WIDTH(DATA_WIDTH  /* default 16 */)
   ) mem_real_inst (
-      .i_clka (clk),
-      .i_clkb (clk),
+      .i_Clka (i_Clk),
+      .i_Clkb (i_Clk),
       .i_ena  ('1),
       .i_enb  ('1),
       .i_wea  (i_wren_re_A),
@@ -46,8 +46,8 @@ module memory_bank #(
       .DATA_DEPTH(2 ** DATA_DEPTH_LOG2),
       .DATA_WIDTH(DATA_WIDTH  /* default 16 */)
   ) mem_imag_inst (
-      .i_clka (clk),
-      .i_clkb (clk),
+      .i_Clka (i_Clk),
+      .i_Clkb (i_Clk),
       .i_ena  ('1),
       .i_enb  ('1),
       .i_wea  (i_wren_im_A),

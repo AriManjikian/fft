@@ -22,13 +22,13 @@ def wrap_signed(value, width):
 @cocotb.test()
 async def basic(dut):
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
     WIDTH_A = int(dut.DATA_WIDTH.value)
     WIDTH_B = int(dut.DATA_WIDTH.value)
     OUT_WIDTH = max(WIDTH_A, WIDTH_B) + 1
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
 
     for _ in range(100):
         ar = rand_signed(WIDTH_A)
@@ -41,7 +41,7 @@ async def basic(dut):
         dut.i_br.value = br
         dut.i_bi.value = bi
 
-        await ClockCycles(dut.clk, 1)
+        await ClockCycles(dut.i_Clk, 1)
 
         exp_cr = ar + br
         exp_ci = ai + bi
@@ -49,7 +49,7 @@ async def basic(dut):
         exp_cr = wrap_signed(exp_cr, OUT_WIDTH)
         exp_ci = wrap_signed(exp_ci, OUT_WIDTH)
 
-        await ClockCycles(dut.clk, 1)
+        await ClockCycles(dut.i_Clk, 1)
 
         got_cr = dut.o_cr.value.to_signed()
         got_ci = dut.o_ci.value.to_signed()
@@ -62,7 +62,7 @@ async def basic(dut):
 @cocotb.test()
 async def overflow(dut):
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
     WIDTH_A = int(dut.DATA_WIDTH.value)
     WIDTH_B = int(dut.DATA_WIDTH.value)
@@ -81,12 +81,12 @@ async def overflow(dut):
     dut.i_br.value = br
     dut.i_bi.value = bi
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
 
     exp_cr = wrap_signed(ar + br, OUT_WIDTH)
     exp_ci = wrap_signed(ai + bi, OUT_WIDTH)
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
 
     got_cr = dut.o_cr.value.to_signed()
     got_ci = dut.o_ci.value.to_signed()
@@ -107,12 +107,12 @@ async def overflow(dut):
     dut.i_br.value = br
     dut.i_bi.value = bi
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
 
     exp_cr = wrap_signed(ar + br, OUT_WIDTH)
     exp_ci = wrap_signed(ai + bi, OUT_WIDTH)
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
 
     got_cr = dut.o_cr.value.to_signed()
     got_ci = dut.o_ci.value.to_signed()

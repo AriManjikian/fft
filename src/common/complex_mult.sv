@@ -2,7 +2,7 @@ module complex_mult #(
     parameter int DATA_WIDTH_A = fft::DATA_WIDTH,
     parameter int DATA_WIDTH_B = fft::DATA_WIDTH
 ) (
-    input logic clk,
+    input logic i_Clk,
     // Input A
     input logic signed [DATA_WIDTH_A-1:0] i_ar,
     input logic signed [DATA_WIDTH_A-1:0] i_ai,
@@ -43,7 +43,7 @@ module complex_mult #(
   logic signed [DATA_WIDTH_A+DATA_WIDTH_B:0] r_pr;
   logic signed [DATA_WIDTH_A+DATA_WIDTH_B:0] r_pi;
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
 
     r_ar <= i_ar;
     r_ai <= i_ai;
@@ -62,7 +62,7 @@ module complex_mult #(
   end
 
   // C = (Ar - Ai) * Bi
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_add_common <= $signed(r_ar) - $signed(r_ai);
     r_mult_common <= r_add_common * r_bi_d1;
     r_common <= r_mult_common;
@@ -70,14 +70,14 @@ module complex_mult #(
 
 
   // P_r = (Br - Bi) * Ar + (Ar - Ai) * Bi = Ar*Br - Ai*Bi = (Br - Bi) * Ar + C
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_add_re <= $signed(r_br_d1) - $signed(r_bi_d1);
     r_mult_re <= r_ar_d2 * r_add_re;
     r_pr <= r_mult_re + r_common;
   end
 
   // P_i = (Br + Bi) * Ai + (Ar - Ai) * Bi = Ai*Br + Ar*Bi = (Br + Bi) * Ai + C
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_add_im <= $signed(r_bi_d1) + $signed(r_br_d1);
     r_mult_im <= r_ai_d2 * r_add_im;
     r_pi <= r_mult_im + r_common;

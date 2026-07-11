@@ -3,7 +3,7 @@ module twiddle_rom #(
     parameter int DATA_DEPTH = fft::DATA_DEPTH,
     parameter string INIT_FILE = ""
 ) (
-    input logic clk,
+    input logic i_Clk,
     input logic [$clog2(DATA_DEPTH)-1:0] i_addr,
     output logic [DATA_WIDTH-1:0] o_data
 );
@@ -22,7 +22,7 @@ module twiddle_rom #(
     end
   end
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     o_data <= r_ram_array[i_addr];
   end
 

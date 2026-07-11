@@ -2,7 +2,7 @@ module sp_bram #(
     parameter int RAM_WIDTH = fft::DATA_DEPTH,
     parameter int RAM_DEPTH_BITS = $clog2(fft::DATA_DEPTH)
 ) (
-    input logic clk,
+    input logic i_Clk,
     input logic [RAM_DEPTH_BITS-1:0] i_addr,
     input logic [RAM_WIDTH-1:0] i_din,
     input logic i_we,
@@ -13,7 +13,7 @@ module sp_bram #(
   localparam int C_RAM_DEPTH = 2 ** RAM_DEPTH_BITS;
 
   logic [C_RAM_WIDTH-1:0] ram[C_RAM_DEPTH];
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (i_we) begin
       ram[i_addr] <= i_din;
     end

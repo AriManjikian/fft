@@ -3,7 +3,7 @@ import fft::*;
 module agu #(
     parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
-    input logic clk,
+    input logic i_Clk,
     input logic i_start,
     output logic o_done,
     output logic o_wr_en,
@@ -60,7 +60,7 @@ module agu #(
   endfunction
 
   // FSM
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     o_done <= 1'b0;
     case (ctrl_state)
       IDLE: begin
@@ -91,7 +91,7 @@ module agu #(
   assign w_clear = (ctrl_state != RUN);
 
   // Address Counter
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (w_clear || w_hold) begin
       r_addr <= '0;
     end else begin
@@ -101,7 +101,7 @@ module agu #(
   end
 
   // Level Counter
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (w_clear) begin
       r_level <= '0;
     end else if (r_addr[DATA_DEPTH_LOG2-1]) begin
@@ -111,7 +111,7 @@ module agu #(
   end
 
   // Hold Counter
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (r_addr[DATA_DEPTH_LOG2-1]) begin
       r_hold_counter <= C_HOLD_CNT_W'(C_HOLD_COUNT);
     end else if (r_hold_counter[C_HOLD_CNT_W-1] != 1'b1) begin
@@ -121,7 +121,7 @@ module agu #(
   assign w_hold = ~r_hold_counter[C_HOLD_CNT_W-1];
 
   // Pipeline
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_addr_d1        <= r_addr;
 
     r_addr_2x        <= {r_addr[DATA_DEPTH_LOG2-2:0], 1'b0};
@@ -134,7 +134,7 @@ module agu #(
 
   // Addr A generator
   // Rotate N(2j, i)
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (w_clear) begin
       r_addr_a <= '0;
     end else begin
@@ -144,7 +144,7 @@ module agu #(
 
   // Addr B generator
   // Rotate N(2j+1, i)
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (w_clear) begin
       r_addr_b <= '0;
     end else begin
@@ -154,7 +154,7 @@ module agu #(
 
   // Addr Twiddle generator
   // Mask N-1-{level} of j
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     if (w_clear) begin
       r_tw_bit_mask <= '0;
       r_addr_tw     <= '0;

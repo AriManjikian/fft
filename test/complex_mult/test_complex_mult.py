@@ -22,14 +22,14 @@ def wrap_signed(value, width):
 @cocotb.test()
 async def basic(dut):
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
     WIDTH_A = int(dut.DATA_WIDTH_A.value)
     WIDTH_B = int(dut.DATA_WIDTH_B.value)
     OUT_WIDTH = WIDTH_A + WIDTH_B + 1
     LATENCY = 6
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.i_Clk, 1)
 
     for _ in range(100):
         ar = rand_signed(WIDTH_A)
@@ -48,7 +48,7 @@ async def basic(dut):
         exp_pr = wrap_signed(exp_pr, OUT_WIDTH)
         exp_pi = wrap_signed(exp_pi, OUT_WIDTH)
 
-        await ClockCycles(dut.clk, LATENCY)
+        await ClockCycles(dut.i_Clk, LATENCY)
 
         got_pr = dut.o_pr.value.to_signed()
         got_pi = dut.o_pi.value.to_signed()
@@ -61,7 +61,7 @@ async def basic(dut):
 @cocotb.test()
 async def overflow(dut):
     CLK_PERIOD_NS = 10
-    cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.i_Clk, CLK_PERIOD_NS, unit="ns").start())
 
     WIDTH_A = int(dut.DATA_WIDTH_A.value)
     WIDTH_B = int(dut.DATA_WIDTH_B.value)
@@ -84,7 +84,7 @@ async def overflow(dut):
     exp_pr = wrap_signed((ar * br) - (ai * bi), OUT_WIDTH)
     exp_pi = wrap_signed((ar * bi) + (ai * br), OUT_WIDTH)
 
-    await ClockCycles(dut.clk, LATENCY)
+    await ClockCycles(dut.i_Clk, LATENCY)
 
     assert dut.o_pr.value.to_signed() == exp_pr
     assert dut.o_pi.value.to_signed() == exp_pi
@@ -105,7 +105,7 @@ async def overflow(dut):
     exp_pr = wrap_signed((ar * br) - (ai * bi), OUT_WIDTH)
     exp_pi = wrap_signed((ar * bi) + (ai * br), OUT_WIDTH)
 
-    await ClockCycles(dut.clk, LATENCY)
+    await ClockCycles(dut.i_Clk, LATENCY)
 
     assert dut.o_pr.value.to_signed() == exp_pr
     assert dut.o_pi.value.to_signed() == exp_pi

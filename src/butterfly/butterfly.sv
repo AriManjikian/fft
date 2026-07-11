@@ -2,7 +2,7 @@ module butterfly #(
     parameter int DATA_WIDTH  = fft::DATA_WIDTH,
     parameter int DATA_FORMAT = fft::QFORMAT
 ) (
-    input logic clk,
+    input logic i_Clk,
     // Input A
     input logic signed [DATA_WIDTH-1:0] i_ar,
     input logic signed [DATA_WIDTH-1:0] i_ai,
@@ -44,7 +44,7 @@ module butterfly #(
 
   // Pipeline
   integer i;
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     for (i = NUM_PIPELINE_STAGES - 1; i > 0; i--) begin
       r_pipe_data_re[i] <= r_pipe_data_re[i-1];
       r_pipe_data_im[i] <= r_pipe_data_im[i-1];
@@ -59,7 +59,7 @@ module butterfly #(
       .DATA_WIDTH_A(DATA_WIDTH  /* default 16 */),
       .DATA_WIDTH_B(DATA_WIDTH  /* default 16 */)
   ) complex_mult (
-      .clk (clk),
+      .i_Clk (i_Clk),
       .i_ar(i_br),
       .i_ai(i_bi),
       .i_br(i_tr),
@@ -68,7 +68,7 @@ module butterfly #(
       .o_pi(w_cmult_out_im)
   );
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_overflow_mult <= 1'b0;
 
     // Real
@@ -100,7 +100,7 @@ module butterfly #(
   complex_adder #(
       .DATA_WIDTH(DATA_WIDTH + 1)
   ) complex_adder_A (
-      .clk (clk),
+      .i_Clk (i_Clk),
       .i_ar(r_pipe_data_re[$high(r_pipe_data_re)]),
       .i_ai(r_pipe_data_im[$high(r_pipe_data_im)]),
       .i_br(r_cmult_out_re_trunc),
@@ -112,7 +112,7 @@ module butterfly #(
   complex_adder #(
       .DATA_WIDTH(DATA_WIDTH + 1)
   ) complex_adder_B (
-      .clk (clk),
+      .i_Clk (i_Clk),
       .i_ar(r_pipe_data_re[$high(r_pipe_data_re)]),
       .i_ai(r_pipe_data_im[$high(r_pipe_data_im)]),
       .i_br(-r_cmult_out_re_trunc),
@@ -121,7 +121,7 @@ module butterfly #(
       .o_ci(w_yi)
   );
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     r_overflow_out <= 1'b0;
 
     // XR

@@ -2,7 +2,7 @@ module bit_reversal_unit #(
     parameter int DATA_WIDTH = fft::DATA_WIDTH,
     parameter int DATA_DEPTH_LOG2 = $clog2(fft::DATA_DEPTH)
 ) (
-    input clk,
+    input i_Clk,
     input reset,
     input logic [DATA_WIDTH-1:0] i_tdata_re,
     input logic [DATA_WIDTH-1:0] i_tdata_im,
@@ -21,7 +21,7 @@ module bit_reversal_unit #(
 
   logic unsigned [DATA_DEPTH_LOG2-1:0] r_addr;
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge i_Clk) begin
     o_tvalid <= 0;
     if (reset == '1) begin
       r_addr <= '0;
