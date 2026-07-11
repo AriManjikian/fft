@@ -14,6 +14,7 @@ module fft_top #(
 
     output logic [DATA_WIDTH-1:0] o_tdata_re,
     output logic [DATA_WIDTH-1:0] o_tdata_im,
+    output logic unsigned [DATA_WIDTH*2:0] o_mag_sq,
     output logic [$clog2(NFFT)-1:0] o_xk_index,
     output logic o_tvalid
 );
@@ -246,6 +247,14 @@ module fft_top #(
       .o_yr              (w_stored_yr),
       .o_yi              (w_stored_yi)
   );
+
+  logic unsigned [DATA_WIDTH*2-1:0] re_sq;
+  assign re_sq = $signed(o_tdata_re) * $signed(o_tdata_re);
+  logic unsigned [DATA_WIDTH*2-1:0] im_sq;
+  assign im_sq = $signed(o_tdata_im) * $signed(o_tdata_im);
+  assign o_mag_sq = re_sq + im_sq;
+
+
   // Twiddle ROM
   twiddle_rom_wrapper #(
       .DATA_WIDTH(DATA_WIDTH),
@@ -306,4 +315,5 @@ module fft_top #(
   );
   assign w_buffer_re_out = w_buffer_re_im_out[2*DATA_WIDTH-1:DATA_WIDTH];
   assign w_buffer_im_out = w_buffer_re_im_out[DATA_WIDTH-1:0];
+
 endmodule

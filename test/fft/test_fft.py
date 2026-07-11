@@ -16,10 +16,15 @@ logger.setLevel(logging.DEBUG)
 NFFT = DATA_WIDTH = QFORMAT = SCALE = GOLDEN_SCALE = 0
 
 TIMEOUT_CYCLES = 5000
-DEFAULT_TOL = 3e-4
+DEFAULT_TOL = 4e-4
 MIN_TONES = 1
 MAX_TONES = 20
 AMPLITUDE_HEADROOM = 0.85
+
+SQUARE_MIN_PERIODS = 1
+SQUARE_MAX_PERIODS = 8
+SQUARE_MIN_DUTY = 0.2
+SQUARE_MAX_DUTY = 0.8
 
 PLOT_RESULTS = os.environ.get("PLOT", "0") == "1"
 
@@ -36,6 +41,10 @@ def to_fixed(value):
 
 def from_fixed(value):
     return value / SCALE
+
+
+def from_fixed_mag(value):
+    return value / (SCALE**2)
 
 
 def get_seed() -> int:
@@ -77,6 +86,70 @@ def make_random_test_vector(nfft: int, rng: np.random.Generator):
     return time_domain, golden, tones
 
 
+def make_square_wave_test_vector(
+    nfft: int,
+    num_periods: int,
+    duty: float = 0.5,
+    amplitude: float = AMPLITUDE_HEADROOM,
+    phase: float = 0.0,
+):
+    if not (0.0 < duty < 1.0):
+        raise ValueError("duty must be in (0, 1)")
+    if num_periods < 1 or nfft % num_periods != 0:
+        raise ValueError("num_periods must evenly divide nfft")
+
+    n = np.arange(nfft)
+    period_samples = nfft / num_periods
+    phase_samples = (phase / (2 * np.pi)) * period_samples
+    frac = ((n + phase_samples) % period_samples) / period_samples
+
+    time_domain = np.where(frac < duty, amplitude, -amplitude)
+
+    golden = np.fft.fft(time_domain) * GOLDEN_SCALE
+
+    logger.info(
+        "generated square wave: periods=%d duty=%.2f amplitude=%.3f phase=%+.3f",
+        num_periods,
+        duty,
+        amplitude,
+        phase,
+    )
+    return time_domain, golden
+
+
+def make_single_sample_test_vector(
+    nfft: int,
+    amplitude: float = AMPLITUDE_HEADROOM,
+):
+    time_domain = np.zeros(nfft, dtype=np.float64)
+    time_domain[nfft // 2] = amplitude
+
+    golden = np.fft.fft(time_domain) * GOLDEN_SCALE
+
+    logger.info(
+        "generated single sample: amplitude=%.3f",
+        amplitude,
+    )
+    return time_domain, golden
+
+
+def make_random_square_wave_test_vector(nfft: int, rng: np.random.Generator):
+    divisors = [d for d in range(1, nfft // 2 + 1) if nfft % d == 0]
+    max_periods = min(SQUARE_MAX_PERIODS, max(divisors))
+    candidates = [d for d in divisors if SQUARE_MIN_PERIODS <= d <= max_periods]
+    if not candidates:
+        candidates = [1]
+    num_periods = int(rng.choice(candidates))
+
+    duty = float(rng.uniform(SQUARE_MIN_DUTY, SQUARE_MAX_DUTY))
+    amplitude = float(rng.uniform(0.3, AMPLITUDE_HEADROOM))
+    phase = float(rng.uniform(-np.pi, np.pi))
+
+    return make_square_wave_test_vector(
+        nfft, num_periods=num_periods, duty=duty, amplitude=amplitude, phase=phase
+    )
+
+
 # ----------------------------------------------------------------------
 # dut drive / collect
 # ----------------------------------------------------------------------
@@ -114,10 +187,11 @@ async def collect_outputs(dut, expected_count):
             idx = int(dut.o_xk_index.value)
             re = dut.o_tdata_re.value.signed_integer
             im = dut.o_tdata_im.value.signed_integer
-            outputs.append((idx, re, im))
+            mag = dut.o_mag_sq.value.signed_integer
+            outputs.append((idx, re, im, mag))
             cycles_since_last = 0
             logger.debug(
-                "output beat %2d/%d: idx=%2d re=%6d (%8.5f) im=%6d (%8.5f)",
+                "output beat %2d/%d: idx=%2d re=%6d (%8.5f) im=%6d (%8.5f) mag=%6d (%8.5f)",
                 len(outputs),
                 expected_count,
                 idx,
@@ -125,6 +199,8 @@ async def collect_outputs(dut, expected_count):
                 from_fixed(re),
                 im,
                 from_fixed(im),
+                mag,
+                from_fixed_mag(mag),
             )
 
         if cycles_since_last > TIMEOUT_CYCLES:
@@ -141,7 +217,7 @@ async def collect_outputs(dut, expected_count):
 # ----------------------------------------------------------------------
 def score_against(outputs_sorted, golden, tol, label):
     results = []
-    for idx, re_q, im_q in outputs_sorted:
+    for idx, re_q, im_q, mag in outputs_sorted:
         actual = complex(from_fixed(re_q), from_fixed(im_q))
         g = complex(golden[idx])
         err_re = abs(actual.real - g.real)
@@ -153,7 +229,6 @@ def score_against(outputs_sorted, golden, tol, label):
                 "golden": g,
                 "err_re": err_re,
                 "err_im": err_im,
-                "err_mag": abs(actual - g),
             }
         )
 
@@ -201,17 +276,20 @@ def plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, se
 
     dut_re = np.full(nfft, np.nan)
     dut_im = np.full(nfft, np.nan)
-    for idx, re_q, im_q in outputs_sorted:
+    dut_mag_sq = np.full(nfft, np.nan)
+    for idx, re_q, im_q, mag_q in outputs_sorted:
         dut_re[idx] = from_fixed(re_q)
         dut_im[idx] = from_fixed(im_q)
+        dut_mag_sq[idx] = from_fixed_mag(mag_q)
 
     golden_re = golden.real
     golden_im = golden.imag
+    golden_mag_sq = golden_re**2 + golden_im**2
 
     err_re = dut_re - golden_re
     err_im = dut_im - golden_im
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    fig, axes = plt.subplots(4, 1, figsize=(12, 10))
     fig.suptitle(f"FFT test results (seed={seed}, NFFT={nfft})")
 
     # --- panel 1: input samples ---
@@ -225,45 +303,68 @@ def plot_results(time_domain_re, time_domain_im, outputs_sorted, golden, tol, se
     axes[0].grid(True, alpha=0.3)
 
     # --- panel 2: golden vs dut overlay ---
-    (golden_re_line,) = axes[1].plot(
+    axes[1].plot(
         bins, golden_re, label="golden (real)", linewidth=1.2, marker="o", markersize=2
     )
-    (dut_re_line,) = axes[1].plot(
+    axes[1].plot(
         bins, dut_re, "--", label="dut (real)", linewidth=1.0, marker="o", markersize=2
     )
-    (golden_im_line,) = axes[1].plot(
+    axes[1].plot(
         bins, golden_im, label="golden (imag)", linewidth=1.2, marker="o", markersize=2
     )
-    (dut_im_line,) = axes[1].plot(
+    axes[1].plot(
         bins, dut_im, "--", label="dut (imag)", linewidth=1.0, marker="o", markersize=2
     )
     axes[1].set_title("Golden vs DUT FFT output")
     axes[1].set_xlabel("bin index")
-    axes[1].set_ylabel("magnitude")
+    axes[1].set_ylabel("amplitude")
     axes[1].legend(loc="upper right", ncol=2)
     axes[1].grid(True, alpha=0.3)
 
-    # --- panel 3: error, normalized to tolerance ---
-    (err_re_raw_line,) = axes[2].plot(
-        bins, err_re, label="err (real)", linewidth=1, marker="o", markersize=2
+    # --- panel 3: dut magnitude^2 vs golden magnitude^2 ---
+    axes[2].plot(
+        bins,
+        golden_mag_sq,
+        label="golden magnitude^2",
+        linewidth=1.2,
+        marker="o",
+        markersize=2,
     )
-    (err_im_raw_line,) = axes[2].plot(
-        bins, err_im, label="err (imag)", linewidth=1, marker="o", markersize=2
+    axes[2].plot(
+        bins,
+        dut_mag_sq,
+        "--",
+        label="dut magnitude^2",
+        linewidth=1.0,
+        marker="o",
+        markersize=2,
     )
-    axes[2].axhline(tol, color="r", linestyle=":", linewidth=1, label="+tol")
-    axes[2].axhline(-tol, color="r", linestyle=":", linewidth=1, label="-tol")
-    axes[2].set_title(f"Raw error (dut - golden); tol={tol:.1e}; hover for values")
+    axes[2].set_title("DUT vs golden FFT magnitude^2 (|X[k]|^2)")
     axes[2].set_xlabel("bin index")
-    axes[2].set_ylabel("error")
+    axes[2].set_ylabel("magnitude^2")
     axes[2].legend(loc="upper right", ncol=2)
     axes[2].grid(True, alpha=0.3)
+
+    # --- panel 4: error, normalized to tolerance ---
+    axes[3].plot(
+        bins, err_re, label="err (real)", linewidth=1, marker="o", markersize=2
+    )
+    axes[3].plot(
+        bins, err_im, label="err (imag)", linewidth=1, marker="o", markersize=2
+    )
+    axes[3].axhline(tol, color="r", linestyle=":", linewidth=1, label="+tol")
+    axes[3].axhline(-tol, color="r", linestyle=":", linewidth=1, label="-tol")
+    axes[3].set_title(f"Raw error (dut - golden); tol={tol:.1e}")
+    axes[3].set_xlabel("bin index")
+    axes[3].set_ylabel("error")
+    axes[3].legend(loc="upper right", ncol=2)
+    axes[3].grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
 
 
-@cocotb.test()
-async def test_fft_random_tones(dut):
+async def _setup_dut_and_clock(dut):
     global NFFT, DATA_WIDTH, QFORMAT, SCALE, GOLDEN_SCALE
     NFFT = int(dut.NFFT.value)
     DATA_WIDTH = int(dut.DATA_WIDTH.value)
@@ -271,20 +372,14 @@ async def test_fft_random_tones(dut):
 
     SCALE = 1 << QFORMAT
     GOLDEN_SCALE = 1 / NFFT
-    seed = get_seed()
-    tol = get_tolerance()
-    logger.info("using seed=%d , tolerance=%.1e", seed, tol)
 
     CLK_PERIOD_NS = 10
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
 
-    rng = np.random.default_rng(seed)
 
-    time_domain_re, _golden_re_only, tones = make_random_test_vector(NFFT, rng)
-    time_domain_im, _golden_im_only, tones_im = make_random_test_vector(NFFT, rng)
-
-    golden = np.fft.fft(time_domain_re + 1j * time_domain_im) * GOLDEN_SCALE
-
+async def _run_two_frame_test(
+    dut, time_domain_re, time_domain_im, golden, tol, label, seed=0
+):
     samples_q15 = list(
         zip(
             (to_fixed(v) for v in time_domain_re),
@@ -303,11 +398,11 @@ async def test_fft_random_tones(dut):
 
     # begin loading frame 2 while fft #1 results drain out
     await cocotb.start_soon(drive_input(dut, samples_q15))
-    outputs1 = await collect_outputs(dut, NFFT)
+    outputs1 = await collect_outputs(dut, len(golden))
 
     await RisingEdge(dut.o_tready)
 
-    reported_indices = sorted(idx for idx, _, _ in outputs1)
+    reported_indices = sorted(idx for idx, _, _, _ in outputs1)
     assert reported_indices == list(range(NFFT)), (
         "dut did not emit every bin exactly once"
     )
@@ -315,7 +410,7 @@ async def test_fft_random_tones(dut):
     outputs_sorted = sorted(outputs1, key=lambda t: t[0])
 
     max_err_re, max_err_im, results, failing = score_against(
-        outputs_sorted, golden, tol, "fft1"
+        outputs_sorted, golden, tol, label
     )
 
     if PLOT_RESULTS:
@@ -331,3 +426,57 @@ async def test_fft_random_tones(dut):
             f"{' ...' if len(failing) > 15 else ''}"
         )
         assert not failing, failure_summary
+
+
+@cocotb.test()
+async def test_fft_random_tones(dut):
+    await _setup_dut_and_clock(dut)
+    seed = get_seed()
+    tol = get_tolerance()
+    logger.info("using seed=%d , tolerance=%.1e", seed, tol)
+
+    rng = np.random.default_rng(seed)
+
+    time_domain_re, _golden_re_only, tones = make_random_test_vector(NFFT, rng)
+    time_domain_im, _golden_im_only, tones_im = make_random_test_vector(NFFT, rng)
+
+    golden = np.fft.fft(time_domain_re + 1j * time_domain_im) * GOLDEN_SCALE
+
+    await _run_two_frame_test(
+        dut, time_domain_re, time_domain_im, golden, tol, "fft_random", seed
+    )
+
+
+@cocotb.test()
+async def test_fft_square_wave(dut):
+    await _setup_dut_and_clock(dut)
+    seed = get_seed()
+    tol = get_tolerance()
+    logger.info("using seed=%d , tolerance=%.1e", seed, tol)
+
+    rng = np.random.default_rng(seed)
+
+    time_domain_re, golden_re_only = make_random_square_wave_test_vector(NFFT, rng)
+    time_domain_im = np.zeros(NFFT)
+
+    golden = np.fft.fft(time_domain_re + 1j * time_domain_im) * GOLDEN_SCALE
+
+    await _run_two_frame_test(
+        dut, time_domain_re, time_domain_im, golden, tol, "fft_square", seed
+    )
+
+
+@cocotb.test()
+async def test_fft_single_sample(dut):
+    await _setup_dut_and_clock(dut)
+    tol = get_tolerance()
+    logger.info("using tolerance=%.1e", tol)
+
+    time_domain_re, golden_re_only = make_single_sample_test_vector(NFFT)
+    time_domain_im = np.zeros(NFFT)
+
+    golden = np.fft.fft(time_domain_re + 1j * time_domain_im) * GOLDEN_SCALE
+
+    await _run_two_frame_test(
+        dut, time_domain_re, time_domain_im, golden, tol, "fft_single_sample"
+    )

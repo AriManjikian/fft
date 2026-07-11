@@ -13,7 +13,6 @@ module sp_bram #(
   localparam int C_RAM_DEPTH = 2 ** RAM_DEPTH_BITS;
 
   logic [C_RAM_WIDTH-1:0] ram[C_RAM_DEPTH];
-
   always_ff @(posedge clk) begin
     if (i_we) begin
       ram[i_addr] <= i_din;
