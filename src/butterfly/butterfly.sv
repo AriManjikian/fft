@@ -59,13 +59,13 @@ module butterfly #(
       .DATA_WIDTH_A(DATA_WIDTH  /* default 16 */),
       .DATA_WIDTH_B(DATA_WIDTH  /* default 16 */)
   ) complex_mult (
-      .i_Clk (i_Clk),
-      .i_ar(i_br),
-      .i_ai(i_bi),
-      .i_br(i_tr),
-      .i_bi(i_ti),
-      .o_pr(w_cmult_out_re),
-      .o_pi(w_cmult_out_im)
+      .i_Clk(i_Clk),
+      .i_ar (i_br),
+      .i_ai (i_bi),
+      .i_br (i_tr),
+      .i_bi (i_ti),
+      .o_pr (w_cmult_out_re),
+      .o_pi (w_cmult_out_im)
   );
 
   always_ff @(posedge i_Clk) begin
@@ -100,25 +100,25 @@ module butterfly #(
   complex_adder #(
       .DATA_WIDTH(DATA_WIDTH + 1)
   ) complex_adder_A (
-      .i_Clk (i_Clk),
-      .i_ar(r_pipe_data_re[$high(r_pipe_data_re)]),
-      .i_ai(r_pipe_data_im[$high(r_pipe_data_im)]),
-      .i_br(r_cmult_out_re_trunc),
-      .i_bi(r_cmult_out_im_trunc),
-      .o_cr(w_xr),
-      .o_ci(w_xi)
+      .i_Clk(i_Clk),
+      .i_ar (r_pipe_data_re[$high(r_pipe_data_re)]),
+      .i_ai (r_pipe_data_im[$high(r_pipe_data_im)]),
+      .i_br (r_cmult_out_re_trunc),
+      .i_bi (r_cmult_out_im_trunc),
+      .o_cr (w_xr),
+      .o_ci (w_xi)
   );
   // Y = A - T*B
   complex_adder #(
       .DATA_WIDTH(DATA_WIDTH + 1)
   ) complex_adder_B (
-      .i_Clk (i_Clk),
-      .i_ar(r_pipe_data_re[$high(r_pipe_data_re)]),
-      .i_ai(r_pipe_data_im[$high(r_pipe_data_im)]),
-      .i_br(-r_cmult_out_re_trunc),
-      .i_bi(-r_cmult_out_im_trunc),
-      .o_cr(w_yr),
-      .o_ci(w_yi)
+      .i_Clk(i_Clk),
+      .i_ar (r_pipe_data_re[$high(r_pipe_data_re)]),
+      .i_ai (r_pipe_data_im[$high(r_pipe_data_im)]),
+      .i_br (-r_cmult_out_re_trunc),
+      .i_bi (-r_cmult_out_im_trunc),
+      .o_cr (w_yr),
+      .o_ci (w_yi)
   );
 
   always_ff @(posedge i_Clk) begin

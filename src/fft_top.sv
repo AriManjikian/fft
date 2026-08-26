@@ -22,12 +22,12 @@ module fft_top #(
   localparam int C_NFFT_LOG2 = $clog2(NFFT);
 
   // Memory Write Address Pipeline
-  typedef logic [C_NFFT_LOG2-1:0] t_mem_waddr_pipe[0:C_BFU_LATENCY-1];
+  typedef logic [C_NFFT_LOG2-1:0] t_mem_waddr_pipe[0:fft::C_BFU_LATENCY-1];
   t_mem_waddr_pipe r_wr_addr_mem_a_pipe = '{default: '0};
   t_mem_waddr_pipe r_wr_addr_mem_b_pipe = '{default: '0};
 
   // Memory Write Enable Pipeline
-  typedef logic [C_MEM_SEL_PIPE-1:0] t_mem_wren_pipe;
+  typedef logic [fft::C_MEM_SEL_PIPE-1:0] t_mem_wren_pipe;
   t_mem_wren_pipe r_wr_en_mem_pipe = '0;
 
   // FFT State Machine
@@ -179,12 +179,12 @@ module fft_top #(
   always_ff @(posedge i_Clk) begin
     r_wr_addr_mem_a_pipe[0] <= w_agu_rd_addr_a;
     r_wr_addr_mem_b_pipe[0] <= w_agu_rd_addr_b;
-    for (int i = 1; i < C_BFU_LATENCY; i++) begin
+    for (int i = 1; i < fft::C_BFU_LATENCY; i++) begin
       r_wr_addr_mem_a_pipe[i] <= r_wr_addr_mem_a_pipe[i-1];
       r_wr_addr_mem_b_pipe[i] <= r_wr_addr_mem_b_pipe[i-1];
     end
     r_wr_en_mem_pipe <= {
-        r_wr_en_mem_pipe[C_MEM_SEL_PIPE-2:0],
+        r_wr_en_mem_pipe[fft::C_MEM_SEL_PIPE-2:0],
         w_agu_wr_en
     };
     r_rd_addr_mem_a <= w_agu_rd_addr_a;

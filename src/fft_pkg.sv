@@ -1,5 +1,5 @@
 package fft;
-  localparam int NFFT = 1024;
+  localparam int NFFT = 2048;
   localparam int DATA_DEPTH = NFFT;
   localparam int DATA_WIDTH = 16;
   localparam int QFORMAT = 15;
