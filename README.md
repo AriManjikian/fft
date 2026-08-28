@@ -10,11 +10,11 @@ $$
 
 where:
 
-$x_n$ — input samples
-$X_m$ — $m$-th frequency-domain output
-$N$ — number of samples
-$n$ — input sample index, $0 \le n < N$
-$w$ — DFT twiddle factor
+- $x_n$ — input samples
+- $X_m$ — $m$-th frequency-domain output
+- $N$ — number of samples
+- $n$ — input sample index, $0 \le n < N$
+- $w$ — DFT twiddle factor
 
 ## Project Overview
 
