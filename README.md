@@ -39,7 +39,6 @@ where:
 ## FFT Diagram
 
 ![FFT Diagram](./assets/fft_diagram.drawio.png)
-
 - The Address Generation Unit (AGU) handles address generation as well as control signals to write/read from and to the memory banks.
 - The Butterfly Unit (BFU) performs a 2-point FFT on inputs A and B.
 - The Twiddle Factor ROM stores real and imaginary twiddle factors for each FFT index.
